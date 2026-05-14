@@ -68,7 +68,10 @@ async function addSalary({ phone_number, salary_amount }) {
 async function setSession(phone_number, current_step) {
   const sessions = await readJson(FILES.sessions, {});
 
-  sessions[phone_number] = { current_step };
+  sessions[phone_number] =
+    typeof current_step === "object" && current_step !== null
+      ? current_step
+      : { current_step };
   await writeJson(FILES.sessions, sessions);
   return sessions[phone_number];
 }

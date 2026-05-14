@@ -1,11 +1,71 @@
 const express = require("express");
+const fs = require("fs/promises");
+const path = require("path");
 require("dotenv").config();
 const { sendMessage } = require("./services/whatsapp");
-const { addExpense, addSalary, setSession, getSession } = require("./db/db");
+const { setSession, getSession } = require("./db/db");
 
 const app = express();
 
 app.use(express.json());
+
+const FLOW_FILE = path.join(__dirname, "../data/whatsapp-conve-v1.json");
+
+async function loadFlow() {
+  const raw = await fs.readFile(FLOW_FILE, "utf8");
+  const parsed = JSON.parse(raw);
+  return parsed?.conversation?.find((item) => item.active) || null;
+}
+
+function menuMessage(node) {
+  const options = (node.answers || [])
+    .filter((answer) => answer.active)
+    .map((answer) => answer.text)
+    .join("\n");
+  return [node.question, node.dummy, options].filter(Boolean).join("\n\n");
+}
+
+function findButtonAnswer(node, text) {
+  const normalized = text.toLowerCase();
+  const buttons = (node.answers || []).filter(
+    (answer) => answer.active && answer.input === "button"
+  );
+  const numericChoice = Number.parseInt(normalized, 10);
+
+  if (Number.isInteger(numericChoice) && numericChoice >= 1 && numericChoice <= buttons.length) {
+    return buttons[numericChoice - 1];
+  }
+
+  return buttons.find((answer) => {
+    const label = answer.text?.toLowerCase() || "";
+    const textWithoutNumber = label.replace(/^\d+\S*\s*/, "").trim();
+    return (
+      label === normalized ||
+      textWithoutNumber === normalized ||
+      answer.key?.toLowerCase() === normalized ||
+      answer.clickId?.toLowerCase() === normalized
+    );
+  });
+}
+
+const isTestMode = String(process.env.WHATSAPP_TEST_MODE || "").toLowerCase() === "true";
+
+function createResponder(res) {
+  const replies = [];
+
+  return {
+    async send(to, message) {
+      replies.push({ to, message });
+      await sendMessage(to, message);
+    },
+    ok() {
+      if (isTestMode) {
+        return res.status(200).json({ ok: true, testMode: true, replies });
+      }
+      return res.sendStatus(200);
+    },
+  };
+}
 
 app.get("/", (req, res) => {
   res.send("Server Running");
@@ -36,133 +96,113 @@ app.get("/webhook", (req, res) => {
 
 app.post("/webhook", async (req, res) => {
   try {
+    const responder = createResponder(res);
     const body = req.body;
     const message = body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
 
-    if (!message) return res.sendStatus(200);
+    if (!message) return responder.ok();
 
     const from = message.from;
     const text = message.text?.body?.trim();
 
-    if (!from || !text) return res.sendStatus(200);
+    if (!from || !text) return responder.ok();
 
-    let session = await getSession(from);
-    if (!session) {
-      session = await setSession(from, "menu");
+    const flow = await loadFlow();
+    if (!flow) {
+      await responder.send(from, "Conversation flow is not configured.");
+      return responder.ok();
     }
 
     const normalized = text.toLowerCase();
 
     if (normalized === "hi" || normalized === "hello") {
-      await setSession(from, "menu");
-      await sendMessage(
-        from,
-        `Welcome to Finance Assistant
-
-1️⃣ Expenses
-2️⃣ Salary
-3️⃣ Report`
-      );
-      return res.sendStatus(200);
-    }
-
-    if (text === "1") {
-      await setSession(from, "expense");
-      await sendMessage(
-        from,
-        `Enter expense details
-
-Format:
-Type - Amount
-
-Example:
-Food - 500`
-      );
-      return res.sendStatus(200);
-    }
-
-    if (text === "2") {
-      await setSession(from, "salary");
-      await sendMessage(from, "Enter salary amount");
-      return res.sendStatus(200);
-    }
-
-    if (text === "3") {
-      await sendMessage(from, "Generating report PDF...");
-      return res.sendStatus(200);
-    }
-
-    if (session.current_step === "expense") {
-      const parts = text.split("-");
-      if (parts.length !== 2) {
-        await sendMessage(
-          from,
-          `Invalid expense format
-
-Use:
-Type - Amount
-
-Example:
-Food - 500`
-        );
-        return res.sendStatus(200);
-      }
-
-      const type = parts[0].trim();
-      const amount = Number(parts[1].trim());
-
-      if (!type || Number.isNaN(amount) || amount <= 0) {
-        await sendMessage(from, "Invalid amount. Please enter a valid number.");
-        return res.sendStatus(200);
-      }
-
-      await addExpense({
-        phone_number: from,
-        expense_type: type,
-        amount,
+      await setSession(from, {
+        current_step: "menu",
+        nodeId: flow.id,
+        answerKey: null,
+        mode: "button",
       });
-
-      await sendMessage(
-        from,
-        `Expense recorded
-
-Type: ${type}
-Amount: ₹${amount}`
-      );
-      await setSession(from, "menu");
-      return res.sendStatus(200);
+      await responder.send(from, menuMessage(flow));
+      return responder.ok();
     }
 
-    if (session.current_step === "salary") {
-      const salaryAmount = Number(text);
-      if (Number.isNaN(salaryAmount) || salaryAmount <= 0) {
-        await sendMessage(from, "Invalid salary amount. Please enter a valid number.");
-        return res.sendStatus(200);
+    let session = await getSession(from);
+    if (!session) {
+      session = await setSession(from, {
+        current_step: "menu",
+        nodeId: flow.id,
+        answerKey: null,
+        mode: "button",
+      });
+      await responder.send(from, menuMessage(flow));
+      return responder.ok();
+    }
+
+    if (session.current_step === "menu") {
+      const selected = findButtonAnswer(flow, text);
+      if (!selected) {
+        await responder.send(from, "Invalid option. Please choose from the menu.");
+        return responder.ok();
       }
 
-      await addSalary({
-        phone_number: from,
-        salary_amount: salaryAmount,
+      const nextNode = selected.followUp?.find((item) => item.active);
+      if (!nextNode) {
+        await responder.send(from, "No follow-up configured for this option.");
+        return responder.ok();
+      }
+
+      await setSession(from, {
+        current_step: "await_input",
+        nodeId: nextNode.id,
+        answerKey: selected.key,
+        mode: "text",
       });
-
-      await sendMessage(
-        from,
-        `Salary recorded
-
-Amount: ₹${salaryAmount}`
-      );
-      await setSession(from, "menu");
-      return res.sendStatus(200);
+      await responder.send(from, [nextNode.question, nextNode.dummy].filter(Boolean).join("\n\n"));
+      return responder.ok();
     }
 
-    await sendMessage(
+    if (session.current_step === "await_input") {
+      const parent = (flow.answers || []).find((item) => item.key === session.answerKey);
+      const inputNode = parent?.followUp?.find((item) => item.id === session.nodeId) || parent?.followUp?.[0];
+      const textAnswer = inputNode?.answers?.find((item) => item.active && item.input === "text");
+
+      if (!textAnswer) {
+        await responder.send(from, "Input step is not configured.");
+        return responder.ok();
+      }
+
+      const rule = textAnswer.validation || {};
+      if (
+        typeof text !== "string" ||
+        text.length < (rule.minLength || 0) ||
+        text.length > (rule.maxLength || Number.MAX_SAFE_INTEGER)
+      ) {
+        await responder.send(from, rule.errorMessage || "Invalid input. Please try again.");
+        return responder.ok();
+      }
+
+      const done = textAnswer.followUp?.[0];
+      if (done?.success) {
+        await responder.send(from, done.success);
+      } else {
+        await responder.send(from, "Saved successfully.");
+      }
+
+      await setSession(from, {
+        current_step: "menu",
+        nodeId: flow.id,
+        answerKey: null,
+        mode: "button",
+      });
+      await responder.send(from, menuMessage(flow));
+      return responder.ok();
+    }
+
+    await responder.send(
       from,
-      `Invalid option
-
-Send:
-Hi`
+      "Invalid option. Send 'Hi' to start."
     );
-    return res.sendStatus(200);
+    return responder.ok();
   } catch (err) {
     console.error(err);
     return res.sendStatus(500);

@@ -1,1 +1,8 @@
-{}
+{
+  "919999999999": {
+    "current_step": "await_input",
+    "nodeId": 1,
+    "answerKey": "report",
+    "mode": "text"
+  }
+}
