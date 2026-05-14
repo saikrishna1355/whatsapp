@@ -11,17 +11,23 @@ app.get("/", (req, res) => {
 });
 
 app.get("/webhook", (req, res) => {
-  const verify_token = process.env.VERIFY_TOKEN;
+  const VERIFY_TOKEN = process.env.VERIFY_TOKEN || "myverifytoken";
 
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
 
-  if (mode && token === verify_token) {
-    res.status(200).send(challenge);
-  } else {
-    res.sendStatus(403);
+  console.log("MODE:", mode);
+  console.log("TOKEN:", token);
+  console.log("CHALLENGE:", challenge);
+
+  if (mode === "subscribe" && token === VERIFY_TOKEN) {
+    console.log("WEBHOOK VERIFIED");
+
+    return res.status(200).send(challenge);
   }
+
+  return res.sendStatus(403);
 });
 
 app.post("/webhook", async (req, res) => {
