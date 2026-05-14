@@ -3,7 +3,7 @@ const fs = require("fs/promises");
 const path = require("path");
 require("dotenv").config();
 const { sendMessage } = require("./services/whatsapp");
-const { setSession, getSession } = require("./db/db");
+const { setSession, getSession, addIncome, addExpense, getReport } = require("./db/db");
 
 const app = express();
 
@@ -142,6 +142,7 @@ app.post("/webhook", async (req, res) => {
       const selected = findButtonAnswer(flow, text);
       if (!selected) {
         await responder.send(from, "Invalid option. Please choose from the menu.");
+        await responder.send(from, menuMessage(flow));
         return responder.ok();
       }
 
@@ -151,13 +152,58 @@ app.post("/webhook", async (req, res) => {
         return responder.ok();
       }
 
+      const hasButtons = (nextNode.answers || []).some((a) => a.active && a.input === "button");
       await setSession(from, {
-        current_step: "await_input",
+        current_step: hasButtons ? "sub_menu" : "await_input",
         nodeId: nextNode.id,
         answerKey: selected.key,
-        mode: "text",
+        mode: hasButtons ? "button" : "text",
       });
-      await responder.send(from, [nextNode.question, nextNode.dummy].filter(Boolean).join("\n\n"));
+      await responder.send(from, menuMessage(nextNode));
+      return responder.ok();
+    }
+
+    if (session.current_step === "sub_menu") {
+      const parent = (flow.answers || []).find((item) => item.key === session.answerKey);
+      const subNode = parent?.followUp?.find((item) => item.id === session.nodeId);
+      if (!subNode) {
+        await responder.send(from, "Sub-menu not configured.");
+        return responder.ok();
+      }
+
+      const selected = findButtonAnswer(subNode, text);
+      if (!selected) {
+        await responder.send(from, "Invalid option. Please choose from the list.");
+        await setSession(from, { current_step: "menu", nodeId: flow.id, answerKey: null, mode: "button" });
+        await responder.send(from, menuMessage(flow));
+        return responder.ok();
+      }
+
+      const done = selected.followUp?.[0];
+      if (done?.module === "todayReport") {
+        const report = await getReport(from, "today");
+        await responder.send(from, report);
+      } else if (done?.module === "weekReport") {
+        const report = await getReport(from, "week");
+        await responder.send(from, report);
+      } else {
+        const nextNode = selected.followUp?.find((item) => item.active);
+        if (nextNode) {
+          const hasButtons = (nextNode.answers || []).some((a) => a.active && a.input === "button");
+          await setSession(from, {
+            current_step: hasButtons ? "sub_menu" : "await_input",
+            nodeId: nextNode.id,
+            answerKey: selected.key,
+            mode: hasButtons ? "button" : "text",
+          });
+          await responder.send(from, menuMessage(nextNode));
+          return responder.ok();
+        }
+        await responder.send(from, done?.success || "Done.");
+      }
+
+      await setSession(from, { current_step: "menu", nodeId: flow.id, answerKey: null, mode: "button" });
+      await responder.send(from, menuMessage(flow));
       return responder.ok();
     }
 
@@ -168,6 +214,8 @@ app.post("/webhook", async (req, res) => {
 
       if (!textAnswer) {
         await responder.send(from, "Input step is not configured.");
+        await setSession(from, { current_step: "menu", nodeId: flow.id, answerKey: null, mode: "button" });
+        await responder.send(from, menuMessage(flow));
         return responder.ok();
       }
 
@@ -178,15 +226,29 @@ app.post("/webhook", async (req, res) => {
         text.length > (rule.maxLength || Number.MAX_SAFE_INTEGER)
       ) {
         await responder.send(from, rule.errorMessage || "Invalid input. Please try again.");
+        await setSession(from, { current_step: "menu", nodeId: flow.id, answerKey: null, mode: "button" });
+        await responder.send(from, menuMessage(flow));
         return responder.ok();
       }
 
       const done = textAnswer.followUp?.[0];
-      if (done?.success) {
-        await responder.send(from, done.success);
-      } else {
-        await responder.send(from, "Saved successfully.");
+
+      // Parse entries: "Egg sales 200\nMilk 500"
+      const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+      for (const line of lines) {
+        const match = line.match(/^(.+?)\s+(\d+)$/);
+        if (match) {
+          const description = match[1].trim();
+          const amount = Number(match[2]);
+          if (done?.module === "saveIncome") {
+            await addIncome({ phone_number: from, description, amount });
+          } else if (done?.module === "saveExpense") {
+            await addExpense({ phone_number: from, description, amount });
+          }
+        }
       }
+
+      await responder.send(from, done?.success || "Saved successfully.");
 
       await setSession(from, {
         current_step: "menu",
@@ -198,10 +260,8 @@ app.post("/webhook", async (req, res) => {
       return responder.ok();
     }
 
-    await responder.send(
-      from,
-      "Invalid option. Send 'Hi' to start."
-    );
+    await setSession(from, { current_step: "menu", nodeId: flow.id, answerKey: null, mode: "button" });
+    await responder.send(from, menuMessage(flow));
     return responder.ok();
   } catch (err) {
     console.error(err);

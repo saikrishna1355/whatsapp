@@ -1,4 +1,10 @@
 {
+  "1234567890": {
+    "current_step": "menu",
+    "nodeId": 1,
+    "answerKey": null,
+    "mode": "button"
+  },
   "919999999999": {
     "current_step": "await_input",
     "nodeId": 1,

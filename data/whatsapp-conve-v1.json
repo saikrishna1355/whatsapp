@@ -4,7 +4,7 @@
       "id": 1,
       "active": true,
       "question": "👋 Welcome to Farm Business Assistant",
-      "dummy": "Reply with:\n1️⃣ Income\n2️⃣ Expense\n3️⃣ Report",
+      "dummy": "Reply with:\n",
       "answers": [
         {
           "id": 1,
@@ -99,7 +99,7 @@
                 {
                   "id": 1,
                   "input": "button",
-                  "text": "Today",
+                  "text": "1️⃣ Today",
                   "clickId": "today_report",
                   "key": "today_report",
                   "active": true,
@@ -114,7 +114,7 @@
                 {
                   "id": 2,
                   "input": "button",
-                  "text": "This Week",
+                  "text": "2️⃣ This Week",
                   "clickId": "week_report",
                   "key": "week_report",
                   "active": true,

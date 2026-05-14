@@ -4,6 +4,7 @@ const path = require("path");
 const DATA_DIR = path.join(__dirname, "../../data");
 const FILES = {
   expenses: path.join(DATA_DIR, "expenses.json"),
+  incomes: path.join(DATA_DIR, "incomes.json"),
   salaries: path.join(DATA_DIR, "salaries.json"),
   sessions: path.join(DATA_DIR, "sessions.json"),
 };
@@ -40,17 +41,60 @@ function toRecordWithId(list, payload) {
   };
 }
 
-async function addExpense({ phone_number, expense_type, amount }) {
+async function addIncome({ phone_number, description, amount }) {
+  const incomes = await readJson(FILES.incomes, []);
+  const record = toRecordWithId(incomes, {
+    phone_number,
+    description,
+    amount: Number(amount),
+    date: new Date().toISOString().slice(0, 10),
+  });
+  incomes.push(record);
+  await writeJson(FILES.incomes, incomes);
+  return record;
+}
+
+async function addExpense({ phone_number, description, amount }) {
   const expenses = await readJson(FILES.expenses, []);
   const record = toRecordWithId(expenses, {
     phone_number,
-    expense_type,
+    description,
     amount: Number(amount),
+    date: new Date().toISOString().slice(0, 10),
   });
-
   expenses.push(record);
   await writeJson(FILES.expenses, expenses);
   return record;
+}
+
+async function getReport(phone_number, period) {
+  const incomes = await readJson(FILES.incomes, []);
+  const expenses = await readJson(FILES.expenses, []);
+
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+
+  let startDate;
+  if (period === "week") {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 7);
+    startDate = d.toISOString().slice(0, 10);
+  } else {
+    startDate = today;
+  }
+
+  const filterByDate = (list) =>
+    list.filter((r) => r.phone_number === phone_number && r.date >= startDate);
+
+  const userIncomes = filterByDate(incomes);
+  const userExpenses = filterByDate(expenses);
+
+  const totalIncome = userIncomes.reduce((sum, r) => sum + r.amount, 0);
+  const totalExpense = userExpenses.reduce((sum, r) => sum + r.amount, 0);
+  const profit = totalIncome - totalExpense;
+
+  const label = period === "week" ? "Weekly" : "Today's";
+  return `📊 ${label} Report\nIncome: $${totalIncome}\nExpense: $${totalExpense}\nProfit: $${profit}`;
 }
 
 async function addSalary({ phone_number, salary_amount }) {
@@ -82,8 +126,10 @@ async function getSession(phone_number) {
 }
 
 module.exports = {
+  addIncome,
   addExpense,
   addSalary,
   setSession,
   getSession,
+  getReport,
 };
