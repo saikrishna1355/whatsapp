@@ -81,6 +81,21 @@ async function addMediaCapture(payload) {
   return record;
 }
 
+async function updateMediaCapture(id, patch) {
+  const mediaCaptures = await readJson(FILES.mediaCaptures, []);
+  const index = mediaCaptures.findIndex((item) => item.id === id);
+
+  if (index === -1) return null;
+
+  mediaCaptures[index] = {
+    ...mediaCaptures[index],
+    ...patch,
+    updated_at: new Date().toISOString(),
+  };
+  await writeJson(FILES.mediaCaptures, mediaCaptures);
+  return mediaCaptures[index];
+}
+
 async function getReport(phone_number, period) {
   const incomes = await readJson(FILES.incomes, []);
   const expenses = await readJson(FILES.expenses, []);
@@ -107,8 +122,15 @@ async function getReport(phone_number, period) {
   const totalExpense = userExpenses.reduce((sum, r) => sum + r.amount, 0);
   const profit = totalIncome - totalExpense;
 
-  const label = period === "week" ? "Weekly" : "Today's";
-  return `📊 ${label} Report\nIncome: $${totalIncome}\nExpense: $${totalExpense}\nProfit: $${profit}`;
+  return {
+    period,
+    date: today,
+    incomes: userIncomes,
+    expenses: userExpenses,
+    totalIncome,
+    totalExpense,
+    profit,
+  };
 }
 
 async function addSalary({ phone_number, salary_amount }) {
@@ -143,6 +165,7 @@ module.exports = {
   addIncome,
   addExpense,
   addMediaCapture,
+  updateMediaCapture,
   addSalary,
   setSession,
   getSession,
