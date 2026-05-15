@@ -2,7 +2,7 @@ const express = require("express");
 const fs = require("fs/promises");
 const path = require("path");
 require("dotenv").config();
-const { sendMessage } = require("./services/whatsapp");
+const { sendMessage, sendButtons, sendList } = require("./services/whatsapp");
 const { setSession, getSession, addIncome, addExpense, getReport } = require("./db/db");
 
 const app = express();
@@ -17,12 +17,12 @@ async function loadFlow() {
   return parsed?.conversation?.find((item) => item.active) || null;
 }
 
-function menuMessage(node) {
-  const options = (node.answers || [])
-    .filter((answer) => answer.active)
-    .map((answer) => answer.text)
-    .join("\n");
-  return [node.question, node.dummy, options].filter(Boolean).join("\n\n");
+function getActiveButtons(node) {
+  return (node.answers || []).filter((a) => a.active && a.input === "button");
+}
+
+function menuBody(node) {
+  return [node.question, node.dummy].filter(Boolean).join("\n\n");
 }
 
 function findButtonAnswer(node, text) {
@@ -57,6 +57,20 @@ function createResponder(res) {
     async send(to, message) {
       replies.push({ to, message });
       await sendMessage(to, message);
+    },
+    async sendInteractive(to, node) {
+      const buttons = getActiveButtons(node);
+      const body = menuBody(node);
+      if (buttons.length <= 3) {
+        const btns = buttons.map((b) => ({ id: b.clickId || b.key, title: b.text.replace(/^\S+\s*/, "").slice(0, 20) }));
+        replies.push({ to, body, buttons: btns });
+        await sendButtons(to, body, btns);
+      } else {
+        const rows = buttons.map((b) => ({ id: b.clickId || b.key, title: b.text.replace(/^\S+\s*/, "").slice(0, 24) }));
+        const sections = [{ title: "Options", rows }];
+        replies.push({ to, body, sections });
+        await sendList(to, body, "Choose", sections);
+      }
     },
     ok() {
       if (isTestMode) {
@@ -103,7 +117,10 @@ app.post("/webhook", async (req, res) => {
     if (!message) return responder.ok();
 
     const from = message.from;
-    const text = message.text?.body?.trim();
+    const text =
+      message.interactive?.button_reply?.id ||
+      message.interactive?.list_reply?.id ||
+      message.text?.body?.trim();
 
     if (!from || !text) return responder.ok();
 
@@ -122,7 +139,7 @@ app.post("/webhook", async (req, res) => {
         answerKey: null,
         mode: "button",
       });
-      await responder.send(from, menuMessage(flow));
+      await responder.sendInteractive(from, flow);
       return responder.ok();
     }
 
@@ -134,15 +151,15 @@ app.post("/webhook", async (req, res) => {
         answerKey: null,
         mode: "button",
       });
-      await responder.send(from, menuMessage(flow));
+      await responder.sendInteractive(from, flow);
       return responder.ok();
     }
 
     if (session.current_step === "menu") {
       const selected = findButtonAnswer(flow, text);
       if (!selected) {
-        await responder.send(from, "Invalid option. Please choose from the menu.");
-        await responder.send(from, menuMessage(flow));
+        await responder.send(from, "Invalid option.");
+        await responder.sendInteractive(from, flow);
         return responder.ok();
       }
 
@@ -159,7 +176,11 @@ app.post("/webhook", async (req, res) => {
         answerKey: selected.key,
         mode: hasButtons ? "button" : "text",
       });
-      await responder.send(from, menuMessage(nextNode));
+      if (hasButtons) {
+        await responder.sendInteractive(from, nextNode);
+      } else {
+        await responder.send(from, menuBody(nextNode));
+      }
       return responder.ok();
     }
 
@@ -168,14 +189,16 @@ app.post("/webhook", async (req, res) => {
       const subNode = parent?.followUp?.find((item) => item.id === session.nodeId);
       if (!subNode) {
         await responder.send(from, "Sub-menu not configured.");
+        await setSession(from, { current_step: "menu", nodeId: flow.id, answerKey: null, mode: "button" });
+        await responder.sendInteractive(from, flow);
         return responder.ok();
       }
 
       const selected = findButtonAnswer(subNode, text);
       if (!selected) {
-        await responder.send(from, "Invalid option. Please choose from the list.");
+        await responder.send(from, "Invalid option.");
         await setSession(from, { current_step: "menu", nodeId: flow.id, answerKey: null, mode: "button" });
-        await responder.send(from, menuMessage(flow));
+        await responder.sendInteractive(from, flow);
         return responder.ok();
       }
 
@@ -196,14 +219,18 @@ app.post("/webhook", async (req, res) => {
             answerKey: selected.key,
             mode: hasButtons ? "button" : "text",
           });
-          await responder.send(from, menuMessage(nextNode));
+          if (hasButtons) {
+            await responder.sendInteractive(from, nextNode);
+          } else {
+            await responder.send(from, menuBody(nextNode));
+          }
           return responder.ok();
         }
         await responder.send(from, done?.success || "Done.");
       }
 
       await setSession(from, { current_step: "menu", nodeId: flow.id, answerKey: null, mode: "button" });
-      await responder.send(from, menuMessage(flow));
+      await responder.sendInteractive(from, flow);
       return responder.ok();
     }
 
@@ -215,7 +242,7 @@ app.post("/webhook", async (req, res) => {
       if (!textAnswer) {
         await responder.send(from, "Input step is not configured.");
         await setSession(from, { current_step: "menu", nodeId: flow.id, answerKey: null, mode: "button" });
-        await responder.send(from, menuMessage(flow));
+        await responder.sendInteractive(from, flow);
         return responder.ok();
       }
 
@@ -227,7 +254,7 @@ app.post("/webhook", async (req, res) => {
       ) {
         await responder.send(from, rule.errorMessage || "Invalid input. Please try again.");
         await setSession(from, { current_step: "menu", nodeId: flow.id, answerKey: null, mode: "button" });
-        await responder.send(from, menuMessage(flow));
+        await responder.sendInteractive(from, flow);
         return responder.ok();
       }
 
@@ -256,12 +283,12 @@ app.post("/webhook", async (req, res) => {
         answerKey: null,
         mode: "button",
       });
-      await responder.send(from, menuMessage(flow));
+      await responder.sendInteractive(from, flow);
       return responder.ok();
     }
 
     await setSession(from, { current_step: "menu", nodeId: flow.id, answerKey: null, mode: "button" });
-    await responder.send(from, menuMessage(flow));
+    await responder.sendInteractive(from, flow);
     return responder.ok();
   } catch (err) {
     console.error(err);
