@@ -3,6 +3,7 @@ const axios = require("axios");
 const testMode = String(process.env.WHATSAPP_TEST_MODE || "").toLowerCase() === "true";
 
 const API_URL = `https://graph.facebook.com/v22.0/${process.env.PHONE_NUMBER_ID}/messages`;
+const GRAPH_URL = "https://graph.facebook.com/v22.0";
 const headers = {
   Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
   "Content-Type": "application/json",
@@ -70,4 +71,25 @@ async function sendList(to, body, buttonText, sections) {
   await axios.post(API_URL, payload, { headers });
 }
 
-module.exports = { sendMessage, sendButtons, sendList };
+async function getMediaUrl(mediaId) {
+  const response = await axios.get(`${GRAPH_URL}/${mediaId}`, {
+    headers: {
+      Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+    },
+  });
+
+  return response.data;
+}
+
+async function downloadMedia(mediaUrl) {
+  const response = await axios.get(mediaUrl, {
+    responseType: "arraybuffer",
+    headers: {
+      Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+    },
+  });
+
+  return Buffer.from(response.data);
+}
+
+module.exports = { sendMessage, sendButtons, sendList, getMediaUrl, downloadMedia };

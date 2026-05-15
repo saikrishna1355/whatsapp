@@ -5,6 +5,7 @@ const DATA_DIR = path.join(__dirname, "../../data");
 const FILES = {
   expenses: path.join(DATA_DIR, "expenses.json"),
   incomes: path.join(DATA_DIR, "incomes.json"),
+  mediaCaptures: path.join(DATA_DIR, "media-captures.json"),
   salaries: path.join(DATA_DIR, "salaries.json"),
   sessions: path.join(DATA_DIR, "sessions.json"),
 };
@@ -64,6 +65,19 @@ async function addExpense({ phone_number, description, amount }) {
   });
   expenses.push(record);
   await writeJson(FILES.expenses, expenses);
+  return record;
+}
+
+async function addMediaCapture(payload) {
+  const mediaCaptures = await readJson(FILES.mediaCaptures, []);
+  const record = toRecordWithId(mediaCaptures, {
+    ...payload,
+    date: new Date().toISOString().slice(0, 10),
+    analysis_status: payload.analysis_status || "pending",
+  });
+
+  mediaCaptures.push(record);
+  await writeJson(FILES.mediaCaptures, mediaCaptures);
   return record;
 }
 
@@ -128,6 +142,7 @@ async function getSession(phone_number) {
 module.exports = {
   addIncome,
   addExpense,
+  addMediaCapture,
   addSalary,
   setSession,
   getSession,

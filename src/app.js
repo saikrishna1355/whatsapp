@@ -3,7 +3,8 @@ const fs = require("fs/promises");
 const path = require("path");
 require("dotenv").config();
 const { sendMessage, sendButtons, sendList } = require("./services/whatsapp");
-const { setSession, getSession, addIncome, addExpense, getReport } = require("./db/db");
+const { getMediaPayload, saveInboundMedia } = require("./services/mediaCapture");
+const { setSession, getSession, addIncome, addExpense, addMediaCapture, getReport } = require("./db/db");
 
 const app = express();
 
@@ -121,8 +122,9 @@ app.post("/webhook", async (req, res) => {
       message.interactive?.button_reply?.id ||
       message.interactive?.list_reply?.id ||
       message.text?.body?.trim();
+    const mediaPayload = getMediaPayload(message);
 
-    if (!from || !text) return responder.ok();
+    if (!from || (!text && !mediaPayload)) return responder.ok();
 
     const flow = await loadFlow();
     if (!flow) {
@@ -130,7 +132,7 @@ app.post("/webhook", async (req, res) => {
       return responder.ok();
     }
 
-    const normalized = text.toLowerCase();
+    const normalized = String(text || "").toLowerCase();
 
     if (normalized === "hi" || normalized === "hello") {
       await setSession(from, {
@@ -246,6 +248,33 @@ app.post("/webhook", async (req, res) => {
         return responder.ok();
       }
 
+      const done = textAnswer.followUp?.[0];
+
+      if (mediaPayload) {
+        const capture = await saveInboundMedia(message, from, session.answerKey);
+        await addMediaCapture({
+          phone_number: from,
+          question_id: inputNode?.id,
+          question: inputNode?.question,
+          module: done?.module,
+          ...capture,
+        });
+
+        await responder.send(
+          from,
+          `${mediaPayload.type === "image" ? "Receipt image" : "Voice message"} captured successfully. Analysis is pending.`
+        );
+
+        await setSession(from, {
+          current_step: "menu",
+          nodeId: flow.id,
+          answerKey: null,
+          mode: "button",
+        });
+        await responder.sendInteractive(from, flow);
+        return responder.ok();
+      }
+
       const rule = textAnswer.validation || {};
       if (
         typeof text !== "string" ||
@@ -257,8 +286,6 @@ app.post("/webhook", async (req, res) => {
         await responder.sendInteractive(from, flow);
         return responder.ok();
       }
-
-      const done = textAnswer.followUp?.[0];
 
       // Parse entries: "Egg sales 200\nMilk 500"
       const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
