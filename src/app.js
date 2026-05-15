@@ -370,7 +370,7 @@ app.post("/webhook", async (req, res) => {
             );
           }
         } catch (error) {
-          console.error("OpenAI analysis failed:", error);
+          console.error("AI analysis failed:", error);
           await updateMediaCapture(captureRecord.id, {
             analysis_status: "failed",
             analysis_error: error.message,

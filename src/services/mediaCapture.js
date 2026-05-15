@@ -25,17 +25,29 @@ function getMediaPayload(message) {
 }
 
 function extensionFromMimeType(mimeType, mediaType) {
+  const normalizedMimeType = String(mimeType || "").split(";")[0].trim().toLowerCase();
   const map = {
     "image/jpeg": "jpg",
+    "image/jpg": "jpg",
     "image/png": "png",
     "image/webp": "webp",
     "audio/ogg": "ogg",
+    "audio/ogg; codecs=opus": "ogg",
+    "audio/opus": "ogg",
+    "application/ogg": "ogg",
     "audio/mpeg": "mp3",
+    "audio/mp3": "mp3",
     "audio/mp4": "m4a",
+    "audio/x-m4a": "m4a",
+    "audio/webm": "webm",
     "audio/aac": "aac",
+    "audio/amr": "amr",
+    "audio/wav": "wav",
+    "audio/x-wav": "wav",
+    "audio/flac": "flac",
   };
 
-  return map[mimeType] || (mediaType === "image" ? "jpg" : "bin");
+  return map[normalizedMimeType] || (mediaType === "image" ? "jpg" : "ogg");
 }
 
 async function saveInboundMedia(message, from, answerKey) {

@@ -96,6 +96,33 @@ function getImageFormat(mimeType) {
   return "jpeg";
 }
 
+function getTranscribeMediaFormat(fileKey, mimeType) {
+  const extension = path.extname(fileKey).replace(".", "").toLowerCase();
+  const allowedFormats = new Set(["amr", "flac", "wav", "ogg", "mp3", "mp4", "webm", "m4a"]);
+
+  if (allowedFormats.has(extension)) {
+    return extension;
+  }
+
+  const normalizedMimeType = String(mimeType || "").split(";")[0].trim().toLowerCase();
+  const formatByMimeType = {
+    "audio/amr": "amr",
+    "audio/flac": "flac",
+    "audio/wav": "wav",
+    "audio/x-wav": "wav",
+    "audio/ogg": "ogg",
+    "application/ogg": "ogg",
+    "audio/opus": "ogg",
+    "audio/mpeg": "mp3",
+    "audio/mp3": "mp3",
+    "audio/mp4": "mp4",
+    "audio/x-m4a": "m4a",
+    "audio/webm": "webm",
+  };
+
+  return formatByMimeType[normalizedMimeType] || "ogg";
+}
+
 function getS3Bucket() {
   if (!process.env.AWS_TRANSCRIBE_BUCKET) {
     throw new Error("AWS_TRANSCRIBE_BUCKET is required for voice analysis");
@@ -246,7 +273,7 @@ async function transcribeAudio(capture) {
       new StartTranscriptionJobCommand({
         TranscriptionJobName: jobName,
         LanguageCode: process.env.AWS_TRANSCRIBE_LANGUAGE_CODE || "en-US",
-        MediaFormat: path.extname(uploaded.key).replace(".", "") || undefined,
+        MediaFormat: getTranscribeMediaFormat(uploaded.key, capture.mime_type),
         Media: {
           MediaFileUri: uploaded.uri,
         },
