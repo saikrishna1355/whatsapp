@@ -26,13 +26,42 @@ let bedrockClient;
 let s3Client;
 let transcribeClient;
 
-function getRegion() {
+function getRegion(service) {
+  if (service === "bedrock") {
+    return (
+      process.env.AWS_BEDROCK_REGION ||
+      process.env.AWS_REGION ||
+      process.env.AWS_DEFAULT_REGION ||
+      "us-east-1"
+    );
+  }
+
+  if (service === "s3") {
+    return (
+      process.env.AWS_S3_REGION ||
+      process.env.AWS_TRANSCRIBE_REGION ||
+      process.env.AWS_REGION ||
+      process.env.AWS_DEFAULT_REGION ||
+      "us-east-1"
+    );
+  }
+
+  if (service === "transcribe") {
+    return (
+      process.env.AWS_TRANSCRIBE_REGION ||
+      process.env.AWS_S3_REGION ||
+      process.env.AWS_REGION ||
+      process.env.AWS_DEFAULT_REGION ||
+      "us-east-1"
+    );
+  }
+
   return process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1";
 }
 
 function getBedrockClient() {
   if (!bedrockClient) {
-    bedrockClient = new BedrockRuntimeClient({ region: getRegion() });
+    bedrockClient = new BedrockRuntimeClient({ region: getRegion("bedrock") });
   }
 
   return bedrockClient;
@@ -40,7 +69,7 @@ function getBedrockClient() {
 
 function getS3Client() {
   if (!s3Client) {
-    s3Client = new S3Client({ region: getRegion() });
+    s3Client = new S3Client({ region: getRegion("s3") });
   }
 
   return s3Client;
@@ -48,14 +77,17 @@ function getS3Client() {
 
 function getTranscribeClient() {
   if (!transcribeClient) {
-    transcribeClient = new TranscribeClient({ region: getRegion() });
+    transcribeClient = new TranscribeClient({ region: getRegion("transcribe") });
   }
 
   return transcribeClient;
 }
 
 function getBedrockModel() {
-  return process.env.AWS_BEDROCK_MODEL || "anthropic.claude-3-haiku-20240307-v1:0";
+  return (
+    process.env.AWS_BEDROCK_MODEL ||
+    "anthropic.claude-3-5-haiku-20241022-v1:0"
+  );
 }
 
 function getImageFormat(mimeType) {
