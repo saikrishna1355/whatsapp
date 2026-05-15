@@ -1,0 +1,16 @@
+import { Command as $Command } from "@smithy/core/client";
+import { getEndpointPlugin } from "@smithy/core/endpoints";
+import { commonParams } from "../endpoint/EndpointParameters";
+import { CreateLanguageModel$ } from "../schemas/schemas_0";
+export { $Command };
+export class CreateLanguageModelCommand extends $Command
+    .classBuilder()
+    .ep(commonParams)
+    .m(function (Command, cs, config, o) {
+    return [getEndpointPlugin(config, Command.getEndpointParameterInstructions())];
+})
+    .s("Transcribe", "CreateLanguageModel", {})
+    .n("TranscribeClient", "CreateLanguageModelCommand")
+    .sc(CreateLanguageModel$)
+    .build() {
+}

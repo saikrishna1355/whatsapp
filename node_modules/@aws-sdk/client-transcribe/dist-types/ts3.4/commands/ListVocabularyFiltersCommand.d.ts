@@ -1,0 +1,53 @@
+import { Command as $Command } from "@smithy/core/client";
+import { MetadataBearer as __MetadataBearer } from "@smithy/types";
+import {
+  ListVocabularyFiltersRequest,
+  ListVocabularyFiltersResponse,
+} from "../models/models_0";
+import {
+  ServiceInputTypes,
+  ServiceOutputTypes,
+  TranscribeClientResolvedConfig,
+} from "../TranscribeClient";
+export { __MetadataBearer };
+export { $Command };
+export interface ListVocabularyFiltersCommandInput
+  extends ListVocabularyFiltersRequest {}
+export interface ListVocabularyFiltersCommandOutput
+  extends ListVocabularyFiltersResponse,
+    __MetadataBearer {}
+declare const ListVocabularyFiltersCommand_base: {
+  new (
+    input: ListVocabularyFiltersCommandInput
+  ): import("@smithy/core/client").CommandImpl<
+    ListVocabularyFiltersCommandInput,
+    ListVocabularyFiltersCommandOutput,
+    TranscribeClientResolvedConfig,
+    ServiceInputTypes,
+    ServiceOutputTypes
+  >;
+  new (
+    ...[input]: [] | [ListVocabularyFiltersCommandInput]
+  ): import("@smithy/core/client").CommandImpl<
+    ListVocabularyFiltersCommandInput,
+    ListVocabularyFiltersCommandOutput,
+    TranscribeClientResolvedConfig,
+    ServiceInputTypes,
+    ServiceOutputTypes
+  >;
+  getEndpointParameterInstructions(): {
+    [x: string]: unknown;
+  };
+};
+export declare class ListVocabularyFiltersCommand extends ListVocabularyFiltersCommand_base {
+  protected static __types: {
+    api: {
+      input: ListVocabularyFiltersRequest;
+      output: ListVocabularyFiltersResponse;
+    };
+    sdk: {
+      input: ListVocabularyFiltersCommandInput;
+      output: ListVocabularyFiltersCommandOutput;
+    };
+  };
+}

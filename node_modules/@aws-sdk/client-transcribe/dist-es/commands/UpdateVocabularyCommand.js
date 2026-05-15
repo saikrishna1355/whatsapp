@@ -1,0 +1,16 @@
+import { Command as $Command } from "@smithy/core/client";
+import { getEndpointPlugin } from "@smithy/core/endpoints";
+import { commonParams } from "../endpoint/EndpointParameters";
+import { UpdateVocabulary$ } from "../schemas/schemas_0";
+export { $Command };
+export class UpdateVocabularyCommand extends $Command
+    .classBuilder()
+    .ep(commonParams)
+    .m(function (Command, cs, config, o) {
+    return [getEndpointPlugin(config, Command.getEndpointParameterInstructions())];
+})
+    .s("Transcribe", "UpdateVocabulary", {})
+    .n("TranscribeClient", "UpdateVocabularyCommand")
+    .sc(UpdateVocabulary$)
+    .build() {
+}

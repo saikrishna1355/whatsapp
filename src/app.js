@@ -12,7 +12,7 @@ const {
   getMediaPayload,
   saveInboundMedia,
 } = require("./services/mediaCapture");
-const { analyzeCapturedMedia } = require("./services/openaiAnalysis");
+const { analyzeCapturedMedia } = require("./services/aiAnalysis");
 const {
   setSession,
   getSession,

@@ -1,9 +1,12 @@
 const fs = require("fs/promises");
-const path = require("path");
 const { createReadStream } = require("fs");
 const OpenAI = require("openai");
-
-const DATA_DIR = path.join(__dirname, "../../data");
+const {
+  getAbsoluteMediaPath,
+  getExtractionPrompt,
+  parseJsonObject,
+  normalizeEntries,
+} = require("./aiUtils");
 
 let client;
 
@@ -25,31 +28,6 @@ function getClient() {
   return client;
 }
 
-function getAbsoluteMediaPath(capture) {
-  return path.join(DATA_DIR, capture.file_path);
-}
-
-function parseJsonObject(raw) {
-  const text = String(raw || "").trim();
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error("AI response did not contain JSON");
-  }
-
-  return JSON.parse(jsonMatch[0]);
-}
-
-function normalizeEntries(entries) {
-  if (!Array.isArray(entries)) return [];
-
-  return entries
-    .map((entry) => ({
-      description: String(entry.description || "").trim(),
-      amount: Number(entry.amount),
-    }))
-    .filter((entry) => entry.description && Number.isFinite(entry.amount) && entry.amount > 0);
-}
-
 async function parseEntriesFromText(text, moduleName) {
   const openai = getClient();
 
@@ -61,9 +39,7 @@ async function parseEntriesFromText(text, moduleName) {
         content: [
           {
             type: "input_text",
-            text: `Extract farm ${moduleName === "saveExpense" ? "expense" : "income"} entries from this text.
-Return only valid JSON with this shape:
-{"entries":[{"description":"Egg sales","amount":200}]}
+            text: `${getExtractionPrompt(moduleName, "transcript")}
 
 Text:
 ${text}`,
@@ -93,10 +69,7 @@ async function analyzeReceiptImage(capture) {
         content: [
           {
             type: "input_text",
-            text: `Read this farm receipt or handwritten note.
-Extract ${capture.module === "saveExpense" ? "expense" : "income"} entries.
-Return only valid JSON with this shape:
-{"entries":[{"description":"Egg sales","amount":200}]}`,
+            text: getExtractionPrompt(capture.module, "receipt or handwritten note"),
           },
           {
             type: "input_image",

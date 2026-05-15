@@ -1,0 +1,53 @@
+import { Command as $Command } from "@smithy/core/client";
+import { MetadataBearer as __MetadataBearer } from "@smithy/types";
+import {
+  StartTranscriptionJobRequest,
+  StartTranscriptionJobResponse,
+} from "../models/models_0";
+import {
+  ServiceInputTypes,
+  ServiceOutputTypes,
+  TranscribeClientResolvedConfig,
+} from "../TranscribeClient";
+export { __MetadataBearer };
+export { $Command };
+export interface StartTranscriptionJobCommandInput
+  extends StartTranscriptionJobRequest {}
+export interface StartTranscriptionJobCommandOutput
+  extends StartTranscriptionJobResponse,
+    __MetadataBearer {}
+declare const StartTranscriptionJobCommand_base: {
+  new (
+    input: StartTranscriptionJobCommandInput
+  ): import("@smithy/core/client").CommandImpl<
+    StartTranscriptionJobCommandInput,
+    StartTranscriptionJobCommandOutput,
+    TranscribeClientResolvedConfig,
+    ServiceInputTypes,
+    ServiceOutputTypes
+  >;
+  new (
+    input: StartTranscriptionJobCommandInput
+  ): import("@smithy/core/client").CommandImpl<
+    StartTranscriptionJobCommandInput,
+    StartTranscriptionJobCommandOutput,
+    TranscribeClientResolvedConfig,
+    ServiceInputTypes,
+    ServiceOutputTypes
+  >;
+  getEndpointParameterInstructions(): {
+    [x: string]: unknown;
+  };
+};
+export declare class StartTranscriptionJobCommand extends StartTranscriptionJobCommand_base {
+  protected static __types: {
+    api: {
+      input: StartTranscriptionJobRequest;
+      output: StartTranscriptionJobResponse;
+    };
+    sdk: {
+      input: StartTranscriptionJobCommandInput;
+      output: StartTranscriptionJobCommandOutput;
+    };
+  };
+}

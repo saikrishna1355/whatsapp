@@ -1,0 +1,16 @@
+import { Command as $Command } from "@smithy/core/client";
+import { getEndpointPlugin } from "@smithy/core/endpoints";
+import { commonParams } from "../endpoint/EndpointParameters";
+import { DeleteMedicalScribeJob$ } from "../schemas/schemas_0";
+export { $Command };
+export class DeleteMedicalScribeJobCommand extends $Command
+    .classBuilder()
+    .ep(commonParams)
+    .m(function (Command, cs, config, o) {
+    return [getEndpointPlugin(config, Command.getEndpointParameterInstructions())];
+})
+    .s("Transcribe", "DeleteMedicalScribeJob", {})
+    .n("TranscribeClient", "DeleteMedicalScribeJobCommand")
+    .sc(DeleteMedicalScribeJob$)
+    .build() {
+}

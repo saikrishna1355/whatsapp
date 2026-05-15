@@ -1,0 +1,53 @@
+import { Command as $Command } from "@smithy/core/client";
+import { MetadataBearer as __MetadataBearer } from "@smithy/types";
+import {
+  CreateMedicalVocabularyRequest,
+  CreateMedicalVocabularyResponse,
+} from "../models/models_0";
+import {
+  ServiceInputTypes,
+  ServiceOutputTypes,
+  TranscribeClientResolvedConfig,
+} from "../TranscribeClient";
+export { __MetadataBearer };
+export { $Command };
+export interface CreateMedicalVocabularyCommandInput
+  extends CreateMedicalVocabularyRequest {}
+export interface CreateMedicalVocabularyCommandOutput
+  extends CreateMedicalVocabularyResponse,
+    __MetadataBearer {}
+declare const CreateMedicalVocabularyCommand_base: {
+  new (
+    input: CreateMedicalVocabularyCommandInput
+  ): import("@smithy/core/client").CommandImpl<
+    CreateMedicalVocabularyCommandInput,
+    CreateMedicalVocabularyCommandOutput,
+    TranscribeClientResolvedConfig,
+    ServiceInputTypes,
+    ServiceOutputTypes
+  >;
+  new (
+    input: CreateMedicalVocabularyCommandInput
+  ): import("@smithy/core/client").CommandImpl<
+    CreateMedicalVocabularyCommandInput,
+    CreateMedicalVocabularyCommandOutput,
+    TranscribeClientResolvedConfig,
+    ServiceInputTypes,
+    ServiceOutputTypes
+  >;
+  getEndpointParameterInstructions(): {
+    [x: string]: unknown;
+  };
+};
+export declare class CreateMedicalVocabularyCommand extends CreateMedicalVocabularyCommand_base {
+  protected static __types: {
+    api: {
+      input: CreateMedicalVocabularyRequest;
+      output: CreateMedicalVocabularyResponse;
+    };
+    sdk: {
+      input: CreateMedicalVocabularyCommandInput;
+      output: CreateMedicalVocabularyCommandOutput;
+    };
+  };
+}
