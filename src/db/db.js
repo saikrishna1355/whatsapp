@@ -93,8 +93,15 @@ async function getReport(phone_number, period) {
   const totalExpense = userExpenses.reduce((sum, r) => sum + r.amount, 0);
   const profit = totalIncome - totalExpense;
 
-  const label = period === "week" ? "Weekly" : "Today's";
-  return `📊 ${label} Report\nIncome: $${totalIncome}\nExpense: $${totalExpense}\nProfit: $${profit}`;
+  return {
+    period,
+    date: today,
+    incomes: userIncomes,
+    expenses: userExpenses,
+    totalIncome,
+    totalExpense,
+    profit,
+  };
 }
 
 async function addSalary({ phone_number, salary_amount }) {

@@ -1,8 +1,11 @@
 const axios = require("axios");
+const FormData = require("form-data");
 
 const testMode = String(process.env.WHATSAPP_TEST_MODE || "").toLowerCase() === "true";
 
-const API_URL = `https://graph.facebook.com/v22.0/${process.env.PHONE_NUMBER_ID}/messages`;
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+const API_URL = `https://graph.facebook.com/v22.0/${PHONE_NUMBER_ID}/messages`;
+const MEDIA_URL = `https://graph.facebook.com/v22.0/${PHONE_NUMBER_ID}/media`;
 const headers = {
   Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
   "Content-Type": "application/json",
@@ -70,4 +73,31 @@ async function sendList(to, body, buttonText, sections) {
   await axios.post(API_URL, payload, { headers });
 }
 
-module.exports = { sendMessage, sendButtons, sendList };
+async function sendDocument(to, pdfBuffer, filename) {
+  if (testMode) {
+    console.log(`\n[WHATSAPP_TEST_MODE] to: ${to}\nDocument: ${filename} (${pdfBuffer.length} bytes)\n`);
+    return;
+  }
+
+  // Upload media
+  const form = new FormData();
+  form.append("messaging_product", "whatsapp");
+  form.append("file", pdfBuffer, { filename, contentType: "application/pdf" });
+  form.append("type", "application/pdf");
+
+  const uploadRes = await axios.post(MEDIA_URL, form, {
+    headers: { Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`, ...form.getHeaders() },
+  });
+
+  const mediaId = uploadRes.data.id;
+
+  // Send document message
+  await axios.post(API_URL, {
+    messaging_product: "whatsapp",
+    to,
+    type: "document",
+    document: { id: mediaId, filename },
+  }, { headers });
+}
+
+module.exports = { sendMessage, sendButtons, sendList, sendDocument };

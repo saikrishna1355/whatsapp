@@ -2,8 +2,9 @@ const express = require("express");
 const fs = require("fs/promises");
 const path = require("path");
 require("dotenv").config();
-const { sendMessage, sendButtons, sendList } = require("./services/whatsapp");
+const { sendMessage, sendButtons, sendList, sendDocument } = require("./services/whatsapp");
 const { setSession, getSession, addIncome, addExpense, getReport } = require("./db/db");
+const { generateReportPDF } = require("./services/report");
 
 const app = express();
 
@@ -57,6 +58,10 @@ function createResponder(res) {
     async send(to, message) {
       replies.push({ to, message });
       await sendMessage(to, message);
+    },
+    async sendDocument(to, pdfBuffer, filename) {
+      replies.push({ to, document: filename, size: pdfBuffer.length });
+      await sendDocument(to, pdfBuffer, filename);
     },
     async sendInteractive(to, node) {
       const buttons = getActiveButtons(node);
@@ -203,12 +208,13 @@ app.post("/webhook", async (req, res) => {
       }
 
       const done = selected.followUp?.[0];
-      if (done?.module === "todayReport") {
-        const report = await getReport(from, "today");
-        await responder.send(from, report);
-      } else if (done?.module === "weekReport") {
-        const report = await getReport(from, "week");
-        await responder.send(from, report);
+      if (done?.module === "todayReport" || done?.module === "weekReport") {
+        const period = done.module === "todayReport" ? "today" : "week";
+        const reportData = await getReport(from, period);
+        const pdfBuffer = await generateReportPDF(reportData);
+        const label = period === "week" ? "Weekly" : "Today";
+        const filename = `Report-${label}-${reportData.date}.pdf`;
+        await responder.sendDocument(from, pdfBuffer, filename);
       } else {
         const nextNode = selected.followUp?.find((item) => item.active);
         if (nextNode) {
