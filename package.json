@@ -2,6 +2,9 @@
   "name": "wau-backend",
   "version": "1.0.0",
   "description": "WAU Business Assistant - WhatsApp-first business recordkeeping platform",
+  "engines": {
+    "node": "22.x"
+  },
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
