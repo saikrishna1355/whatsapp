@@ -40,6 +40,7 @@ const income_handler_1 = require("./handlers/income.handler");
 const expense_handler_1 = require("./handlers/expense.handler");
 const report_handler_1 = require("./handlers/report.handler");
 const logger_1 = require("../../utils/logger");
+const parse_entries_1 = require("../../utils/parse-entries");
 const handlers = {
     menu: menu_handler_1.menuHandler,
     income: income_handler_1.incomeHandler,
@@ -52,6 +53,20 @@ exports.messageRouter = {
         try {
             const session = await session_service_1.sessionService.getOrCreate(from);
             logger_1.logger.debug({ from, module: session.module, step: session.step, text: message.text }, 'Routing message');
+            if (session.module === 'menu' && message.text) {
+                const entries = (0, parse_entries_1.parseEntries)(message.text);
+                if (entries.length > 0) {
+                    const lowered = message.text.toLowerCase();
+                    const expenseHints = ['expense', 'spent', 'buy', 'bought', 'paid', 'fuel', 'feed', 'transport'];
+                    const looksExpense = expenseHints.some((hint) => lowered.includes(hint));
+                    const autoModule = looksExpense ? 'expense' : 'income';
+                    logger_1.logger.info({ from, autoModule, entries: entries.length }, 'Auto-routing parsed text from menu');
+                    await session_service_1.sessionService.update(from, { module: autoModule, step: 'await_input' });
+                    const handler = autoModule === 'expense' ? expense_handler_1.expenseHandler : income_handler_1.incomeHandler;
+                    await handler.handle(message, { ...session, module: autoModule, step: 'await_input' });
+                    return;
+                }
+            }
             const handler = handlers[session.module] || menu_handler_1.menuHandler;
             await handler.handle(message, session);
         }

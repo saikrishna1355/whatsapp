@@ -9,15 +9,11 @@ const cors_1 = __importDefault(require("cors"));
 const webhook_routes_1 = require("./routes/webhook.routes");
 const auth_routes_1 = require("./routes/auth.routes");
 const fe_admin_routes_1 = require("./routes/fe-admin.routes");
-const config_1 = require("./config");
 const error_middleware_1 = require("./middleware/error.middleware");
 const request_logger_middleware_1 = require("./middleware/request-logger.middleware");
 const app = (0, express_1.default)();
 exports.app = app;
-app.use((0, cors_1.default)({
-    origin: config_1.config.web.corsOrigin,
-    credentials: true,
-}));
+app.use((0, cors_1.default)({ origin: '*' }));
 app.use(express_1.default.json());
 app.use(request_logger_middleware_1.requestLogger);
 app.get('/', (_req, res) => {

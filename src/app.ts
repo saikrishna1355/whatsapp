@@ -9,10 +9,7 @@ import { requestLogger } from './middleware/request-logger.middleware';
 
 const app = express();
 
-app.use(cors({
-  origin: config.web.corsOrigin,
-  credentials: true,
-}));
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.use(requestLogger);
 

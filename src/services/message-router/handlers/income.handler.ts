@@ -11,10 +11,28 @@ import { logger } from '../../../utils/logger';
 
 interface PendingAIContext {
   pendingEntries?: Array<{ description: string; amount: number }>;
+  pendingHint?: string;
 }
 
 function formatEntries(entries: Array<{ description: string; amount: number }>): string {
   return entries.map((e) => `• ${e.description}: ${e.amount}`).join('\n');
+}
+
+async function sendPostSaveActions(to: string): Promise<void> {
+  await whatsappClient.sendButtons(to, 'What would you like to do next?', [
+    { id: 'income', title: 'Add More' },
+    { id: 'expense', title: 'Switch Expense' },
+    { id: 'report', title: 'Report' },
+  ]);
+}
+
+async function sendConfirmationPrompt(to: string, entries: Array<{ description: string; amount: number }>): Promise<void> {
+  await whatsappClient.sendButtons(to, `I found ${entries.length} income item(s):\n${formatEntries(entries)}\n\nConfirm to save?`, [
+    { id: 'ai_confirm', title: 'Confirm' },
+    { id: 'ai_edit', title: 'Edit' },
+    { id: 'ai_cancel', title: 'Cancel' },
+  ]);
+  await whatsappClient.sendText(to, 'Need changes from another photo/voice? Send it now to replace these entries.');
 }
 
 export const incomeHandler: MessageHandler = {
@@ -23,6 +41,20 @@ export const incomeHandler: MessageHandler = {
     const context = (session.context || {}) as PendingAIContext;
 
     if (session.step === 'await_ai_confirmation') {
+      if (mediaPayload && (mediaPayload.type === 'image' || mediaPayload.type === 'audio')) {
+        await whatsappClient.sendText(from, 'Processing your new voice/image...');
+        const extracted = await extractEntriesFromMedia(mediaPayload, 'income');
+        if (extracted.entries.length === 0) {
+          await whatsappClient.sendText(from, "Couldn't extract entries from this media. Send another one or choose Confirm/Edit/Cancel.");
+          return;
+        }
+        await sessionService.update(from, {
+          step: 'await_ai_confirmation',
+          context: { pendingEntries: extracted.entries },
+        });
+        await sendConfirmationPrompt(from, extracted.entries);
+        return;
+      }
       if (text === 'ai_confirm') {
         const entries = context.pendingEntries || [];
         if (entries.length === 0) {
@@ -35,7 +67,7 @@ export const incomeHandler: MessageHandler = {
         logger.info({ from, count: entries.length }, 'Income entries saved after AI confirmation');
         await whatsappClient.sendText(from, `✅ Saved ${entries.length} income item(s):\n${formatEntries(entries)}`);
         await sessionService.reset(from);
-        await sendMenu(from);
+        await sendPostSaveActions(from);
         return;
       }
       if (text === 'ai_edit') {
@@ -58,7 +90,13 @@ export const incomeHandler: MessageHandler = {
         await whatsappClient.sendText(from, 'Please send corrected income entries as text.');
         return;
       }
-      const editedEntries = parseEntries(text);
+      let editedEntries = parseEntries(text);
+      if (editedEntries.length === 0 && context.pendingHint) {
+        const amountOnly = text.match(/(\d+(?:\.\d{1,2})?)/);
+        if (amountOnly) {
+          editedEntries = [{ description: context.pendingHint, amount: Number(amountOnly[1]) }];
+        }
+      }
       if (editedEntries.length === 0) {
         await whatsappClient.sendText(from, "Couldn't parse entries. Format: Description Amount");
         return;
@@ -67,7 +105,7 @@ export const incomeHandler: MessageHandler = {
       logger.info({ from, count: editedEntries.length }, 'Income entries saved from user edit');
       await whatsappClient.sendText(from, `✅ Saved ${editedEntries.length} income item(s):\n${formatEntries(editedEntries)}`);
       await sessionService.reset(from);
-      await sendMenu(from);
+      await sendPostSaveActions(from);
       return;
     }
 
@@ -75,7 +113,17 @@ export const incomeHandler: MessageHandler = {
     logger.debug({ from, source: text ? 'text' : 'media', parsedCount: entries.length }, 'Income parsing attempt');
     if (entries.length === 0 && mediaPayload && (mediaPayload.type === 'image' || mediaPayload.type === 'audio')) {
       try {
-        entries = await extractEntriesFromMedia(mediaPayload, 'income');
+        await whatsappClient.sendText(from, 'Processing your voice/image. Please wait...');
+        const extracted = await extractEntriesFromMedia(mediaPayload, 'income');
+        entries = extracted.entries;
+        if (entries.length === 0 && extracted.hintDescription) {
+          await sessionService.update(from, {
+            step: 'await_ai_edit',
+            context: { pendingHint: extracted.hintDescription },
+          });
+          await whatsappClient.sendText(from, `I heard "${extracted.hintDescription}". What is the amount? Reply like: ${extracted.hintDescription} 200`);
+          return;
+        }
       } catch (err) {
         logger.error({ err, from, mediaType: mediaPayload.type }, 'Income media extraction failed');
         await whatsappClient.sendText(from, 'Unable to process media now. Please send income as text: Description Amount');
@@ -96,11 +144,7 @@ export const incomeHandler: MessageHandler = {
         step: 'await_ai_confirmation',
         context: { pendingEntries: entries },
       });
-      await whatsappClient.sendButtons(from, `I found ${entries.length} income item(s):\n${formatEntries(entries)}\n\nConfirm to save?`, [
-        { id: 'ai_confirm', title: 'Confirm' },
-        { id: 'ai_edit', title: 'Edit' },
-        { id: 'ai_cancel', title: 'Cancel' },
-      ]);
+      await sendConfirmationPrompt(from, entries);
       return;
     }
 
@@ -110,6 +154,6 @@ export const incomeHandler: MessageHandler = {
     await whatsappClient.sendText(from, `✅ Saved ${entries.length} income item(s):\n${formatEntries(entries)}`);
 
     await sessionService.reset(from);
-    await sendMenu(from);
+    await sendPostSaveActions(from);
   },
 };
