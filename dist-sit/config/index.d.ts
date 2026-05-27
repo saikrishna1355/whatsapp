@@ -27,6 +27,13 @@ export declare const config: {
             readonly model: string;
             readonly maxTokens: number;
         };
+        readonly transcribe: {
+            readonly region: string;
+            readonly bucket: string;
+            readonly languageCode: string;
+            readonly pollMs: number;
+            readonly timeoutMs: number;
+        };
     };
     readonly storage: {
         readonly provider: "local" | "s3";

@@ -45,6 +45,13 @@ export const config = {
       model: optional('AWS_BEDROCK_MODEL', 'anthropic.claude-3-5-haiku-20241022-v1:0'),
       maxTokens: parseInt(optional('AWS_BEDROCK_MAX_TOKENS', '800'), 10),
     },
+    transcribe: {
+      region: optional('AWS_TRANSCRIBE_REGION', 'us-east-1'),
+      bucket: optional('AWS_TRANSCRIBE_BUCKET', ''),
+      languageCode: optional('AWS_TRANSCRIBE_LANGUAGE_CODE', 'en-US'),
+      pollMs: parseInt(optional('AWS_TRANSCRIBE_POLL_MS', '2500'), 10),
+      timeoutMs: parseInt(optional('AWS_TRANSCRIBE_TIMEOUT_MS', '120000'), 10),
+    },
   },
 
   storage: {

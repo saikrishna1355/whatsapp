@@ -6,20 +6,27 @@ import { sessionService } from '../../session/session.service';
 import { incomeService } from '../../../modules/income/income.service';
 import { parseEntries } from '../../../utils/parse-entries';
 import { sendMenu } from './menu.handler';
+import { extractEntriesFromMedia } from '../media-ai.service';
 
 export const incomeHandler: MessageHandler = {
   async handle(message: InboundMessage, session: UserSession): Promise<void> {
-    const { from, text } = message;
+    const { from, text, mediaPayload } = message;
 
-    if (!text) {
-      await whatsappClient.sendText(from, 'Please enter your income as text.\n\nFormat: *Description Amount*');
-      return;
+    let entries = text ? parseEntries(text) : [];
+    if (entries.length === 0 && mediaPayload && (mediaPayload.type === 'image' || mediaPayload.type === 'audio')) {
+      try {
+        entries = await extractEntriesFromMedia(mediaPayload, 'income');
+      } catch {
+        await whatsappClient.sendText(from, 'Unable to process media now. Please send income as text: Description Amount');
+        return;
+      }
     }
 
-    const entries = parseEntries(text);
-
     if (entries.length === 0) {
-      await whatsappClient.sendText(from, "I couldn't parse any entries. Please use the format:\n*Description Amount*\n\nExample: Egg sales 200");
+      await whatsappClient.sendText(
+        from,
+        "I couldn't parse any income entries. Send text like:\n*Description Amount*\nExample: Egg sales 200\n\nYou can also send a receipt image or a voice note."
+      );
       return;
     }
 

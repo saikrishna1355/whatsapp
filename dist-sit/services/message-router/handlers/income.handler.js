@@ -6,16 +6,22 @@ const session_service_1 = require("../../session/session.service");
 const income_service_1 = require("../../../modules/income/income.service");
 const parse_entries_1 = require("../../../utils/parse-entries");
 const menu_handler_1 = require("./menu.handler");
+const media_ai_service_1 = require("../media-ai.service");
 exports.incomeHandler = {
     async handle(message, session) {
-        const { from, text } = message;
-        if (!text) {
-            await whatsapp_client_1.whatsappClient.sendText(from, 'Please enter your income as text.\n\nFormat: *Description Amount*');
-            return;
+        const { from, text, mediaPayload } = message;
+        let entries = text ? (0, parse_entries_1.parseEntries)(text) : [];
+        if (entries.length === 0 && mediaPayload && (mediaPayload.type === 'image' || mediaPayload.type === 'audio')) {
+            try {
+                entries = await (0, media_ai_service_1.extractEntriesFromMedia)(mediaPayload, 'income');
+            }
+            catch {
+                await whatsapp_client_1.whatsappClient.sendText(from, 'Unable to process media now. Please send income as text: Description Amount');
+                return;
+            }
         }
-        const entries = (0, parse_entries_1.parseEntries)(text);
         if (entries.length === 0) {
-            await whatsapp_client_1.whatsappClient.sendText(from, "I couldn't parse any entries. Please use the format:\n*Description Amount*\n\nExample: Egg sales 200");
+            await whatsapp_client_1.whatsappClient.sendText(from, "I couldn't parse any income entries. Send text like:\n*Description Amount*\nExample: Egg sales 200\n\nYou can also send a receipt image or a voice note.");
             return;
         }
         await income_service_1.incomeService.addMany(from, entries);
