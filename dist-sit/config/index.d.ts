@@ -38,4 +38,7 @@ export declare const config: {
     readonly subscription: {
         readonly enabled: boolean;
     };
+    readonly web: {
+        readonly corsOrigin: string;
+    };
 };

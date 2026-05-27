@@ -56,5 +56,8 @@ exports.config = {
     subscription: {
         enabled: optional('SUBSCRIPTION_ENABLED', 'false') === 'true',
     },
+    web: {
+        corsOrigin: optional('WEB_CORS_ORIGIN', 'http://localhost:3000'),
+    },
 };
 //# sourceMappingURL=index.js.map
