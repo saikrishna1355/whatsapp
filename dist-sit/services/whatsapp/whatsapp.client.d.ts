@@ -11,6 +11,7 @@ export interface TestReply {
 export declare function collectTestReplies(): TestReply[];
 export declare function resetTestReplies(): void;
 export declare const whatsappClient: {
+    indicateTyping(messageId: string): Promise<void>;
     sendText(to: string, body: string): Promise<void>;
     sendButtons(to: string, body: string, buttons: Button[]): Promise<void>;
     sendList(to: string, body: string, buttonText: string, sections: ListSection[]): Promise<void>;

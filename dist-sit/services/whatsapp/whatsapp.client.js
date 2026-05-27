@@ -32,6 +32,18 @@ function isTestMode() {
     return config_1.config.whatsapp.testMode;
 }
 exports.whatsappClient = {
+    async indicateTyping(messageId) {
+        if (isTestMode())
+            return;
+        await axios_1.default.post(messagesUrl, {
+            messaging_product: 'whatsapp',
+            status: 'read',
+            message_id: messageId,
+            typing_indicator: {
+                type: 'text',
+            },
+        }, { headers });
+    },
     async sendText(to, body) {
         if (isTestMode()) {
             logger_1.logger.debug({ to, body }, '[TEST_MODE] sendText');

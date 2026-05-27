@@ -32,7 +32,6 @@ exports.incomeHandler = {
         const context = (session.context || {});
         if (session.step === 'await_ai_confirmation') {
             if (mediaPayload && (mediaPayload.type === 'image' || mediaPayload.type === 'audio')) {
-                await whatsapp_client_1.whatsappClient.sendText(from, 'Processing your new voice/image...');
                 const extracted = await (0, media_ai_service_1.extractEntriesFromMedia)(mediaPayload, 'income');
                 if (extracted.entries.length === 0) {
                     await whatsapp_client_1.whatsappClient.sendText(from, "Couldn't extract entries from this media. Send another one or choose Confirm/Edit/Cancel.");
@@ -101,7 +100,6 @@ exports.incomeHandler = {
         logger_1.logger.debug({ from, source: text ? 'text' : 'media', parsedCount: entries.length }, 'Income parsing attempt');
         if (entries.length === 0 && mediaPayload && (mediaPayload.type === 'image' || mediaPayload.type === 'audio')) {
             try {
-                await whatsapp_client_1.whatsappClient.sendText(from, 'Processing your voice/image. Please wait...');
                 const extracted = await (0, media_ai_service_1.extractEntriesFromMedia)(mediaPayload, 'income');
                 entries = extracted.entries;
                 if (entries.length === 0 && extracted.hintDescription) {

@@ -48,6 +48,12 @@ async function handleWebhook(req, res) {
         }
         // Production: acknowledge immediately, process async
         res.sendStatus(200);
+        try {
+            await whatsapp_client_1.whatsappClient.indicateTyping(message.messageId);
+        }
+        catch (err) {
+            logger_1.logger.warn({ err, messageId: message.messageId }, 'Typing indicator failed');
+        }
         await message_router_1.messageRouter.route(message);
     }
     catch (err) {

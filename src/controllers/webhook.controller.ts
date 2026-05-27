@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { config } from '../config';
 import { extractInboundMessage } from '../services/whatsapp/whatsapp.types';
 import { messageRouter } from '../services/message-router/message-router';
-import { resetTestReplies, collectTestReplies } from '../services/whatsapp/whatsapp.client';
+import { resetTestReplies, collectTestReplies, whatsappClient } from '../services/whatsapp/whatsapp.client';
 import { logger } from '../utils/logger';
 import { processedMessageRepository } from '../modules/webhook/processed-message.repository';
 
@@ -54,6 +54,11 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
 
     // Production: acknowledge immediately, process async
     res.sendStatus(200);
+    try {
+      await whatsappClient.indicateTyping(message.messageId);
+    } catch (err) {
+      logger.warn({ err, messageId: message.messageId }, 'Typing indicator failed');
+    }
     await messageRouter.route(message);
   } catch (err) {
     logger.error({ err }, 'Webhook handler error');

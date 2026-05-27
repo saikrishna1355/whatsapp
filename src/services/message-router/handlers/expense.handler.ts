@@ -42,7 +42,6 @@ export const expenseHandler: MessageHandler = {
 
     if (session.step === 'await_ai_confirmation') {
       if (mediaPayload && (mediaPayload.type === 'image' || mediaPayload.type === 'audio')) {
-        await whatsappClient.sendText(from, 'Processing your new voice/image...');
         const extracted = await extractEntriesFromMedia(mediaPayload, 'expense');
         if (extracted.entries.length === 0) {
           await whatsappClient.sendText(from, "Couldn't extract entries from this media. Send another one or choose Confirm/Edit/Cancel.");
@@ -113,7 +112,6 @@ export const expenseHandler: MessageHandler = {
     logger.debug({ from, source: text ? 'text' : 'media', parsedCount: entries.length }, 'Expense parsing attempt');
     if (entries.length === 0 && mediaPayload && (mediaPayload.type === 'image' || mediaPayload.type === 'audio')) {
       try {
-        await whatsappClient.sendText(from, 'Processing your voice/image. Please wait...');
         const extracted = await extractEntriesFromMedia(mediaPayload, 'expense');
         entries = extracted.entries;
         if (entries.length === 0 && extracted.hintDescription) {
