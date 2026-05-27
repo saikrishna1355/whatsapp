@@ -5,104 +5,233 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateReportPDF = generateReportPDF;
 const pdfkit_1 = __importDefault(require("pdfkit"));
+const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
 const date_1 = require("../../utils/date");
-const LEFT = 40;
-const TABLE_WIDTH = 480;
-const ROW_HEIGHT = 25;
+const PAGE_MARGIN = 34;
+const CONTENT_WIDTH = 595.28 - PAGE_MARGIN * 2;
+const CARD_GAP = 10;
+const KPI_CARD_WIDTH = (CONTENT_WIDTH - CARD_GAP * 3) / 4;
+const BRAND_NAME = 'WAU Business Assistant';
+const BRAND_LOGO_PATH = '/home/administrator/whatsapp/whatsapp/brand-placeholder.svg';
+function money(n) {
+    return `Rs ${n.toFixed(2)}`;
+}
+function ensureSpace(doc, needed = 40) {
+    const bottom = doc.page.height - doc.page.margins.bottom;
+    if (doc.y + needed > bottom)
+        doc.addPage();
+}
+function drawHeader(doc, data, dateFrom, dateTo) {
+    const x = PAGE_MARGIN;
+    const y = doc.y;
+    const h = 88;
+    doc.roundedRect(x, y, CONTENT_WIDTH, h, 14).fill('#0f4c5c');
+    const logoX = x + 16;
+    const logoY = y + 14;
+    const logoW = 30;
+    const logoH = 30;
+    let titleX = x + 16;
+    if (fs_1.default.existsSync(BRAND_LOGO_PATH)) {
+        const ext = path_1.default.extname(BRAND_LOGO_PATH).toLowerCase();
+        if (ext === '.png' || ext === '.jpg' || ext === '.jpeg') {
+            doc.image(BRAND_LOGO_PATH, logoX, logoY, { fit: [logoW, logoH] });
+            titleX = logoX + logoW + 10;
+        }
+        else {
+            doc.roundedRect(logoX, logoY, logoW, logoH, 6).fill('#ffffff');
+            doc.fillColor('#0f4c5c').font('Helvetica-Bold').fontSize(9).text('LOGO', logoX, logoY + 11, {
+                width: logoW,
+                align: 'center',
+            });
+            titleX = logoX + logoW + 10;
+        }
+    }
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(18).text(BRAND_NAME, titleX, y + 14);
+    doc.fillColor('#ffffff').font('Helvetica').fontSize(10).text('Business Report', titleX, y + 34);
+    doc.font('Helvetica').fontSize(10).fillColor('#d9eef3');
+    doc.text(data.period === 'week' ? 'Weekly Financial Summary' : 'Daily Financial Summary', titleX, y + 50);
+    doc.text(`Period: ${dateFrom}  to  ${dateTo}`, x + 16, y + 56);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, x + 16, y + 70);
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(24).text(money(data.profit), x, y + 22, {
+        width: CONTENT_WIDTH - 16,
+        align: 'right',
+    });
+    doc.font('Helvetica').fontSize(10).fillColor('#d9eef3').text('Net Profit', x, y + 55, {
+        width: CONTENT_WIDTH - 16,
+        align: 'right',
+    });
+    doc.moveDown(4.8);
+}
+function drawKpiCards(doc, data) {
+    ensureSpace(doc, 92);
+    const y = doc.y;
+    const items = [
+        { label: 'Income', value: money(data.totalIncome), bg: '#e8f7ee', fg: '#1e6a37' },
+        { label: 'Expense', value: money(data.totalExpense), bg: '#fff1f0', fg: '#96352b' },
+        { label: 'Profit', value: money(data.profit), bg: '#e9f3ff', fg: '#1b4f9e' },
+        {
+            label: 'Margin',
+            value: data.totalIncome > 0 ? `${((data.profit / data.totalIncome) * 100).toFixed(1)}%` : '0%',
+            bg: '#f2efff',
+            fg: '#5b3fa3',
+        },
+    ];
+    items.forEach((item, i) => {
+        const x = PAGE_MARGIN + i * (KPI_CARD_WIDTH + CARD_GAP);
+        doc.roundedRect(x, y, KPI_CARD_WIDTH, 72, 10).fill(item.bg);
+        doc.fillColor(item.fg).font('Helvetica-Bold').fontSize(17).text(item.value, x + 10, y + 18, {
+            width: KPI_CARD_WIDTH - 20,
+            align: 'left',
+        });
+        doc.fillColor('#44515c').font('Helvetica').fontSize(10).text(item.label, x + 10, y + 48);
+    });
+    doc.y = y + 84;
+}
+function drawSectionTitle(doc, title) {
+    ensureSpace(doc, 28);
+    doc.fillColor('#1c2733').font('Helvetica-Bold').fontSize(13).text(title, PAGE_MARGIN, doc.y);
+    doc.moveDown(0.4);
+}
+function summarizeByDescription(data, topN = 5) {
+    const map = new Map();
+    for (const row of data) {
+        const key = row.description.trim();
+        map.set(key, (map.get(key) || 0) + Number(row.amount));
+    }
+    return [...map.entries()]
+        .map(([description, amount]) => ({ description, amount }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, topN);
+}
+function drawTopItems(doc, title, items, tone) {
+    ensureSpace(doc, 130);
+    const x = PAGE_MARGIN;
+    const y = doc.y;
+    const w = CONTENT_WIDTH;
+    const h = 116;
+    const barColor = tone === 'income' ? '#2a9d60' : '#c23e3e';
+    doc.roundedRect(x, y, w, h, 10).fill('#f8fafc');
+    doc.fillColor('#1c2733').font('Helvetica-Bold').fontSize(11).text(title, x + 12, y + 10);
+    if (!items.length) {
+        doc.fillColor('#6b7280').font('Helvetica').fontSize(10).text('No data available', x + 12, y + 38);
+        doc.y = y + h + 8;
+        return;
+    }
+    const maxAmount = Math.max(...items.map((i) => i.amount), 1);
+    items.slice(0, 4).forEach((item, i) => {
+        const rowY = y + 30 + i * 20;
+        const barX = x + 180;
+        const barW = Math.max(8, ((w - 270) * item.amount) / maxAmount);
+        doc.fillColor('#374151').font('Helvetica').fontSize(9).text(item.description, x + 12, rowY, { width: 160 });
+        doc.roundedRect(barX, rowY + 2, barW, 10, 4).fill(barColor);
+        doc.fillColor('#111827').font('Helvetica-Bold').fontSize(9).text(money(item.amount), x + w - 90, rowY, { width: 78, align: 'right' });
+    });
+    doc.y = y + h + 8;
+}
+function summarizeByDate(entries) {
+    const m = new Map();
+    for (const e of entries) {
+        const d = (0, date_1.formatDate)(e.date);
+        m.set(d, (m.get(d) || 0) + Number(e.amount));
+    }
+    return m;
+}
+function drawDailySummary(doc, incomes, expenses) {
+    drawSectionTitle(doc, 'Daily Summary');
+    ensureSpace(doc, 140);
+    const inc = summarizeByDate(incomes);
+    const exp = summarizeByDate(expenses);
+    const days = [...new Set([...inc.keys(), ...exp.keys()])].sort();
+    const x = PAGE_MARGIN;
+    const y = doc.y;
+    const rowH = 20;
+    const tableH = 24 + Math.max(1, days.length) * rowH;
+    doc.roundedRect(x, y, CONTENT_WIDTH, tableH, 10).fill('#ffffff').stroke('#dbe4ee');
+    doc.fillColor('#4b5563').font('Helvetica-Bold').fontSize(9);
+    doc.text('Date', x + 12, y + 8);
+    doc.text('Income', x + 220, y + 8, { width: 100, align: 'right' });
+    doc.text('Expense', x + 340, y + 8, { width: 100, align: 'right' });
+    doc.text('Profit', x + 460, y + 8, { width: 90, align: 'right' });
+    if (!days.length) {
+        doc.fillColor('#6b7280').font('Helvetica').text('No records found', x + 12, y + 30);
+        doc.y = y + tableH + 10;
+        return;
+    }
+    days.forEach((d, i) => {
+        const yy = y + 24 + i * rowH;
+        if (i % 2 === 1)
+            doc.rect(x + 1, yy, CONTENT_WIDTH - 2, rowH).fill('#f8fafc');
+        const iAmt = inc.get(d) || 0;
+        const eAmt = exp.get(d) || 0;
+        const p = iAmt - eAmt;
+        doc.fillColor('#111827').font('Helvetica').fontSize(9).text(d, x + 12, yy + 5);
+        doc.text(money(iAmt), x + 220, yy + 5, { width: 100, align: 'right' });
+        doc.text(money(eAmt), x + 340, yy + 5, { width: 100, align: 'right' });
+        doc.fillColor(p >= 0 ? '#166534' : '#b91c1c').font('Helvetica-Bold').text(money(p), x + 460, yy + 5, { width: 90, align: 'right' });
+    });
+    doc.y = y + tableH + 10;
+}
+function drawDetailTable(doc, title, rows) {
+    drawSectionTitle(doc, title);
+    ensureSpace(doc, 80);
+    const x = PAGE_MARGIN;
+    let y = doc.y;
+    const rowH = 20;
+    const drawHeader = () => {
+        doc.roundedRect(x, y, CONTENT_WIDTH, 22, 8).fill('#eef2f7');
+        doc.fillColor('#4b5563').font('Helvetica-Bold').fontSize(9);
+        doc.text('Date', x + 10, y + 7, { width: 80 });
+        doc.text('Description', x + 95, y + 7, { width: 320 });
+        doc.text('Amount', x + 430, y + 7, { width: 90, align: 'right' });
+        y += 24;
+    };
+    drawHeader();
+    if (!rows.length) {
+        doc.fillColor('#6b7280').font('Helvetica').fontSize(10).text('No records found', x + 10, y + 6);
+        doc.y = y + 18;
+        return;
+    }
+    rows.forEach((r, i) => {
+        ensureSpace(doc, 26);
+        if (doc.y !== y)
+            y = doc.y;
+        if (i % 2 === 0)
+            doc.rect(x, y, CONTENT_WIDTH, rowH).fill('#fbfdff');
+        doc.fillColor('#111827').font('Helvetica').fontSize(9);
+        doc.text((0, date_1.formatDate)(r.date), x + 10, y + 6, { width: 80 });
+        doc.text(r.description, x + 95, y + 6, { width: 320, ellipsis: true });
+        doc.text(money(Number(r.amount)), x + 430, y + 6, { width: 90, align: 'right' });
+        y += rowH;
+        if (y + 30 > doc.page.height - doc.page.margins.bottom) {
+            doc.addPage();
+            y = doc.page.margins.top;
+            drawHeader();
+        }
+    });
+    doc.y = y + 6;
+}
 function generateReportPDF(data, dateFrom, dateTo) {
     return new Promise((resolve, reject) => {
-        const doc = new pdfkit_1.default({ margin: 40, size: 'A4' });
+        const doc = new pdfkit_1.default({ size: 'A4', margin: PAGE_MARGIN });
         const chunks = [];
         doc.on('data', (chunk) => chunks.push(chunk));
         doc.on('end', () => resolve(Buffer.concat(chunks)));
         doc.on('error', reject);
-        const label = data.period === 'week' ? 'Weekly Report' : 'Daily Report';
-        // Title
-        doc.fontSize(18).font('Helvetica-Bold').text(label, LEFT, doc.y, { width: TABLE_WIDTH, align: 'center' });
-        doc.moveDown(0.3);
-        doc.fontSize(10).font('Helvetica').text(`Period: ${data.period}`, LEFT, doc.y, { width: TABLE_WIDTH, align: 'center' });
-        doc.moveDown(0.2);
-        doc.text(`From: ${dateFrom}  To: ${dateTo}`, LEFT, doc.y, { width: TABLE_WIDTH, align: 'center' });
-        doc.moveDown(1.5);
-        // Summary
-        doc.fontSize(13).font('Helvetica-Bold').text('Summary', LEFT, doc.y);
-        doc.moveDown(0.5);
-        drawSummaryTable(doc, data.totalIncome, data.totalExpense, data.profit);
-        doc.moveDown(1.5);
-        // Income
-        doc.fontSize(13).font('Helvetica-Bold').text('Income', LEFT, doc.y);
-        doc.moveDown(0.5);
-        drawDataTable(doc, data.incomes);
-        doc.moveDown(1.5);
-        // Expenses
-        doc.fontSize(13).font('Helvetica-Bold').text('Expenses', LEFT, doc.y);
-        doc.moveDown(0.5);
-        drawDataTable(doc, data.expenses);
+        drawHeader(doc, data, dateFrom, dateTo);
+        drawKpiCards(doc, data);
+        drawSectionTitle(doc, 'Highlights');
+        drawTopItems(doc, 'Top Income Items', summarizeByDescription(data.incomes), 'income');
+        drawTopItems(doc, 'Top Expense Items', summarizeByDescription(data.expenses), 'expense');
+        drawDailySummary(doc, data.incomes, data.expenses);
+        drawDetailTable(doc, 'Income Transactions', data.incomes);
+        drawDetailTable(doc, 'Expense Transactions', data.expenses);
+        doc.moveDown(0.8);
+        doc.font('Helvetica').fontSize(8).fillColor('#6b7280').text('Generated by WAU Business Assistant', PAGE_MARGIN, doc.y, {
+            width: CONTENT_WIDTH,
+            align: 'center',
+        });
         doc.end();
     });
-}
-function drawSummaryTable(doc, totalIncome, totalExpense, profit) {
-    const colLabel = LEFT + 5;
-    const colValue = LEFT + TABLE_WIDTH - 105;
-    const colValueWidth = 100;
-    let y = doc.y;
-    doc.rect(LEFT, y, TABLE_WIDTH, ROW_HEIGHT).fill('#f0f0f0').stroke('#cccccc');
-    doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
-    doc.text('Description', colLabel, y + 7);
-    doc.text('Amount', colValue, y + 7, { width: colValueWidth, align: 'right' });
-    y += ROW_HEIGHT;
-    const rows = [
-        { label: 'Total Income', value: totalIncome },
-        { label: 'Total Expense', value: totalExpense },
-        { label: 'Profit', value: profit },
-    ];
-    for (let i = 0; i < rows.length; i++) {
-        const bg = i % 2 === 0 ? '#ffffff' : '#f9f9f9';
-        const isProfit = i === rows.length - 1;
-        doc.rect(LEFT, y, TABLE_WIDTH, ROW_HEIGHT).fill(bg).stroke('#cccccc');
-        doc.fillColor('#000000').fontSize(10).font(isProfit ? 'Helvetica-Bold' : 'Helvetica');
-        doc.text(rows[i].label, colLabel, y + 7);
-        doc.text(String(rows[i].value), colValue, y + 7, { width: colValueWidth, align: 'right' });
-        y += ROW_HEIGHT;
-    }
-    doc.y = y;
-}
-function drawDataTable(doc, data) {
-    const colDate = LEFT + 5;
-    const colDesc = LEFT + 120;
-    const colAmt = LEFT + TABLE_WIDTH - 105;
-    const colAmtWidth = 100;
-    let y = doc.y;
-    doc.rect(LEFT, y, TABLE_WIDTH, ROW_HEIGHT).fill('#f0f0f0').stroke('#cccccc');
-    doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
-    doc.text('Date', colDate, y + 7);
-    doc.text('Description', colDesc, y + 7);
-    doc.text('Amount', colAmt, y + 7, { width: colAmtWidth, align: 'right' });
-    y += ROW_HEIGHT;
-    if (!data.length) {
-        doc.rect(LEFT, y, TABLE_WIDTH, ROW_HEIGHT).stroke('#cccccc');
-        doc.fontSize(10).font('Helvetica').fillColor('#666666');
-        doc.text('No records found', LEFT + 5, y + 7, { width: TABLE_WIDTH - 10, align: 'center' });
-        doc.fillColor('#000000');
-        y += ROW_HEIGHT;
-        doc.y = y;
-        return;
-    }
-    const pageBottom = doc.page.height - doc.page.margins.bottom;
-    doc.fontSize(10).font('Helvetica').fillColor('#000000');
-    for (let i = 0; i < data.length; i++) {
-        if (y + ROW_HEIGHT > pageBottom) {
-            doc.addPage();
-            y = doc.page.margins.top;
-        }
-        const bg = i % 2 === 1 ? '#f9f9f9' : '#ffffff';
-        doc.rect(LEFT, y, TABLE_WIDTH, ROW_HEIGHT).fill(bg).stroke('#cccccc');
-        doc.fillColor('#000000');
-        doc.text((0, date_1.formatDate)(data[i].date), colDate, y + 7);
-        doc.text(data[i].description, colDesc, y + 7);
-        doc.text(String(data[i].amount), colAmt, y + 7, { width: colAmtWidth, align: 'right' });
-        y += ROW_HEIGHT;
-    }
-    doc.y = y;
 }
 //# sourceMappingURL=report.pdf.js.map
