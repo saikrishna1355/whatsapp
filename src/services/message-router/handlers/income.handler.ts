@@ -7,16 +7,19 @@ import { incomeService } from '../../../modules/income/income.service';
 import { parseEntries } from '../../../utils/parse-entries';
 import { sendMenu } from './menu.handler';
 import { extractEntriesFromMedia } from '../media-ai.service';
+import { logger } from '../../../utils/logger';
 
 export const incomeHandler: MessageHandler = {
   async handle(message: InboundMessage, session: UserSession): Promise<void> {
     const { from, text, mediaPayload } = message;
 
     let entries = text ? parseEntries(text) : [];
+    logger.debug({ from, source: text ? 'text' : 'media', parsedCount: entries.length }, 'Income parsing attempt');
     if (entries.length === 0 && mediaPayload && (mediaPayload.type === 'image' || mediaPayload.type === 'audio')) {
       try {
         entries = await extractEntriesFromMedia(mediaPayload, 'income');
       } catch {
+        logger.error({ from, mediaType: mediaPayload.type }, 'Income media extraction failed');
         await whatsappClient.sendText(from, 'Unable to process media now. Please send income as text: Description Amount');
         return;
       }
@@ -31,6 +34,7 @@ export const incomeHandler: MessageHandler = {
     }
 
     await incomeService.addMany(from, entries);
+    logger.info({ from, count: entries.length }, 'Income entries saved');
 
     const summary = entries.map((e) => `• ${e.description}: ${e.amount}`).join('\n');
     await whatsappClient.sendText(from, `✅ Saved ${entries.length} income item(s):\n${summary}`);

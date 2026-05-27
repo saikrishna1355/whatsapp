@@ -39,6 +39,7 @@ async function askBedrockForEntries(parts: Array<any>, module: string): Promise<
     'If nothing valid is found return [] only.',
   ].join(' ');
 
+  logger.debug({ module, model: config.ai.bedrock.model, parts: parts.length }, 'Calling Bedrock Converse');
   const result = await bedrockClient.send(new ConverseCommand({
     modelId: config.ai.bedrock.model,
     system: [{ text: instruction }],
@@ -51,8 +52,13 @@ async function askBedrockForEntries(parts: Array<any>, module: string): Promise<
     .join('\n')
     .trim();
 
-  if (!responseText) return [];
-  return extractEntriesFromText(responseText);
+  if (!responseText) {
+    logger.warn({ module }, 'Bedrock returned empty response');
+    return [];
+  }
+  const entries = extractEntriesFromText(responseText);
+  logger.info({ module, count: entries.length }, 'Bedrock entries extracted');
+  return entries;
 }
 
 function imageFormatFromMime(mimeType: string): 'png' | 'jpeg' | 'gif' | 'webp' {
@@ -96,6 +102,7 @@ export const bedrockProvider: AIProvider = {
       Body: buffer,
       ContentType: mimeType,
     }));
+    logger.info({ bucket, key, mimeType, size: buffer.length }, 'Uploaded audio to S3 for transcription');
 
     await transcribeClient.send(new StartTranscriptionJobCommand({
       TranscriptionJobName: jobName,
@@ -105,6 +112,7 @@ export const bedrockProvider: AIProvider = {
         MediaFileUri: `s3://${bucket}/${key}`,
       },
     }));
+    logger.info({ jobName, mediaFormat, languageCode }, 'Started transcription job');
 
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
@@ -112,6 +120,7 @@ export const bedrockProvider: AIProvider = {
         TranscriptionJobName: jobName,
       }));
       const status = statusRes.TranscriptionJob?.TranscriptionJobStatus;
+      logger.debug({ jobName, status }, 'Transcription job status');
 
       if (status === 'COMPLETED') {
         const uri = statusRes.TranscriptionJob?.Transcript?.TranscriptFileUri;
@@ -120,12 +129,14 @@ export const bedrockProvider: AIProvider = {
         const transcriptJson: any = await transcriptRes.json();
         const text = transcriptJson?.results?.transcripts?.[0]?.transcript ?? '';
         await transcribeClient.send(new DeleteTranscriptionJobCommand({ TranscriptionJobName: jobName }));
+        logger.info({ jobName, transcriptLength: text.length }, 'Transcription completed');
         return text;
       }
 
       if (status === 'FAILED') {
         const reason = statusRes.TranscriptionJob?.FailureReason ?? 'Unknown reason';
         await transcribeClient.send(new DeleteTranscriptionJobCommand({ TranscriptionJobName: jobName }));
+        logger.error({ jobName, reason }, 'Transcription failed');
         throw new Error(`Transcribe failed: ${reason}`);
       }
 
@@ -133,6 +144,7 @@ export const bedrockProvider: AIProvider = {
     }
 
     await transcribeClient.send(new DeleteTranscriptionJobCommand({ TranscriptionJobName: jobName }));
+    logger.error({ jobName, timeoutMs }, 'Transcription timed out');
     throw new Error('Transcribe timeout exceeded');
   },
 };

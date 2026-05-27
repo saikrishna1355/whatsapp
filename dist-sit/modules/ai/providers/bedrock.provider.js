@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.bedrockProvider = void 0;
 const config_1 = require("../../../config");
+const logger_1 = require("../../../utils/logger");
 const client_bedrock_runtime_1 = require("@aws-sdk/client-bedrock-runtime");
 const client_s3_1 = require("@aws-sdk/client-s3");
 const client_transcribe_1 = require("@aws-sdk/client-transcribe");
@@ -29,6 +30,7 @@ async function askBedrockForEntries(parts, module) {
         'No markdown, no extra text.',
         'If nothing valid is found return [] only.',
     ].join(' ');
+    logger_1.logger.debug({ module, model: config_1.config.ai.bedrock.model, parts: parts.length }, 'Calling Bedrock Converse');
     const result = await bedrockClient.send(new client_bedrock_runtime_1.ConverseCommand({
         modelId: config_1.config.ai.bedrock.model,
         system: [{ text: instruction }],
@@ -39,9 +41,13 @@ async function askBedrockForEntries(parts, module) {
         ?.map((block) => block.text ?? '')
         .join('\n')
         .trim();
-    if (!responseText)
+    if (!responseText) {
+        logger_1.logger.warn({ module }, 'Bedrock returned empty response');
         return [];
-    return extractEntriesFromText(responseText);
+    }
+    const entries = extractEntriesFromText(responseText);
+    logger_1.logger.info({ module, count: entries.length }, 'Bedrock entries extracted');
+    return entries;
 }
 function imageFormatFromMime(mimeType) {
     if (mimeType.includes('png'))
@@ -82,6 +88,7 @@ exports.bedrockProvider = {
             Body: buffer,
             ContentType: mimeType,
         }));
+        logger_1.logger.info({ bucket, key, mimeType, size: buffer.length }, 'Uploaded audio to S3 for transcription');
         await transcribeClient.send(new client_transcribe_1.StartTranscriptionJobCommand({
             TranscriptionJobName: jobName,
             LanguageCode: languageCode,
@@ -90,12 +97,14 @@ exports.bedrockProvider = {
                 MediaFileUri: `s3://${bucket}/${key}`,
             },
         }));
+        logger_1.logger.info({ jobName, mediaFormat, languageCode }, 'Started transcription job');
         const start = Date.now();
         while (Date.now() - start < timeoutMs) {
             const statusRes = await transcribeClient.send(new client_transcribe_1.GetTranscriptionJobCommand({
                 TranscriptionJobName: jobName,
             }));
             const status = statusRes.TranscriptionJob?.TranscriptionJobStatus;
+            logger_1.logger.debug({ jobName, status }, 'Transcription job status');
             if (status === 'COMPLETED') {
                 const uri = statusRes.TranscriptionJob?.Transcript?.TranscriptFileUri;
                 if (!uri)
@@ -104,16 +113,19 @@ exports.bedrockProvider = {
                 const transcriptJson = await transcriptRes.json();
                 const text = transcriptJson?.results?.transcripts?.[0]?.transcript ?? '';
                 await transcribeClient.send(new client_transcribe_1.DeleteTranscriptionJobCommand({ TranscriptionJobName: jobName }));
+                logger_1.logger.info({ jobName, transcriptLength: text.length }, 'Transcription completed');
                 return text;
             }
             if (status === 'FAILED') {
                 const reason = statusRes.TranscriptionJob?.FailureReason ?? 'Unknown reason';
                 await transcribeClient.send(new client_transcribe_1.DeleteTranscriptionJobCommand({ TranscriptionJobName: jobName }));
+                logger_1.logger.error({ jobName, reason }, 'Transcription failed');
                 throw new Error(`Transcribe failed: ${reason}`);
             }
             await new Promise((resolve) => setTimeout(resolve, pollMs));
         }
         await transcribeClient.send(new client_transcribe_1.DeleteTranscriptionJobCommand({ TranscriptionJobName: jobName }));
+        logger_1.logger.error({ jobName, timeoutMs }, 'Transcription timed out');
         throw new Error('Transcribe timeout exceeded');
     },
 };
