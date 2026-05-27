@@ -12,7 +12,6 @@
     "resolveJsonModule": true,
     "declaration": true,
     "sourceMap": true,
-    "baseUrl": "./src",
     "paths": {
       "@config/*": ["./src/config/*"],
       "@modules/*": ["./src/modules/*"],
