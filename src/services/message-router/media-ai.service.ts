@@ -3,6 +3,7 @@ import type { ParsedEntry } from '../../utils/parse-entries';
 import type { MediaPayload } from '../whatsapp/whatsapp.types';
 import { whatsappClient } from '../whatsapp/whatsapp.client';
 import { logger } from '../../utils/logger';
+import { parseEntries } from '../../utils/parse-entries';
 
 export async function extractEntriesFromMedia(media: MediaPayload, module: 'income' | 'expense'): Promise<ParsedEntry[]> {
   logger.info({ mediaType: media.type, mediaId: media.mediaId, module }, 'Starting media extraction');
@@ -21,9 +22,13 @@ export async function extractEntriesFromMedia(media: MediaPayload, module: 'inco
   if (media.type === 'audio') {
     logger.info({ mimeType, module }, 'Starting audio transcription');
     const transcript = await provider.transcribeAudio(buffer, mimeType);
-    logger.debug({ transcriptLength: transcript.length, module }, 'Audio transcription completed');
+    logger.debug({ transcriptLength: transcript.length, transcriptPreview: transcript.slice(0, 120), module }, 'Audio transcription completed');
     if (!transcript?.trim()) return [];
-    const entries = await provider.extractEntries(transcript, module);
+    let entries = await provider.extractEntries(transcript, module);
+    if (entries.length === 0) {
+      entries = parseEntries(transcript);
+      logger.info({ module, count: entries.length }, 'Fallback parseEntries from transcript');
+    }
     logger.info({ module, count: entries.length }, 'Audio transcript converted to entries');
     return entries;
   }

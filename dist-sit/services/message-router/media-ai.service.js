@@ -4,6 +4,7 @@ exports.extractEntriesFromMedia = extractEntriesFromMedia;
 const ai_service_1 = require("../../modules/ai/ai.service");
 const whatsapp_client_1 = require("../whatsapp/whatsapp.client");
 const logger_1 = require("../../utils/logger");
+const parse_entries_1 = require("../../utils/parse-entries");
 async function extractEntriesFromMedia(media, module) {
     logger_1.logger.info({ mediaType: media.type, mediaId: media.mediaId, module }, 'Starting media extraction');
     const provider = (0, ai_service_1.getAIProvider)();
@@ -19,10 +20,14 @@ async function extractEntriesFromMedia(media, module) {
     if (media.type === 'audio') {
         logger_1.logger.info({ mimeType, module }, 'Starting audio transcription');
         const transcript = await provider.transcribeAudio(buffer, mimeType);
-        logger_1.logger.debug({ transcriptLength: transcript.length, module }, 'Audio transcription completed');
+        logger_1.logger.debug({ transcriptLength: transcript.length, transcriptPreview: transcript.slice(0, 120), module }, 'Audio transcription completed');
         if (!transcript?.trim())
             return [];
-        const entries = await provider.extractEntries(transcript, module);
+        let entries = await provider.extractEntries(transcript, module);
+        if (entries.length === 0) {
+            entries = (0, parse_entries_1.parseEntries)(transcript);
+            logger_1.logger.info({ module, count: entries.length }, 'Fallback parseEntries from transcript');
+        }
         logger_1.logger.info({ module, count: entries.length }, 'Audio transcript converted to entries');
         return entries;
     }
