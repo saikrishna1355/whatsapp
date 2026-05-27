@@ -16,7 +16,10 @@ function cleanDescription(raw: string): string {
 export function parseEntries(text: string): ParsedEntry[] {
   const normalized = text
     .replace(/[₹$€£]/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/[;,]+/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\s*\n\s*/g, '\n')
+    .replace(/\n+/g, '\n')
     .trim();
 
   const lines = normalized.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -27,6 +30,9 @@ export function parseEntries(text: string): ParsedEntry[] {
     const match = line.match(/^(.+?)\s+(\d+(?:\.\d{1,2})?)$/);
     if (match) {
       const description = cleanDescription(match[1]);
+      // If description still contains digits, this is likely multi-entry text
+      // such as "item1 100 item2 200" and should be parsed by fallback logic.
+      if (/\d/.test(description)) continue;
       if (!description) continue;
       entries.push({
         description,
