@@ -3,7 +3,6 @@ dist/
 dist-uat/
 dist-live/
 .env
-.env.sit
 .env.uat
 .env.live
 *.log
