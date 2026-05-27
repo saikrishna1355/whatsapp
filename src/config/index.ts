@@ -1,0 +1,65 @@
+import dotenv from 'dotenv';
+import path from 'path';
+
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
+function required(key: string): string {
+  const value = process.env[key];
+  if (!value) throw new Error(`Missing required env var: ${key}`);
+  return value;
+}
+
+function optional(key: string, fallback: string): string {
+  return process.env[key] || fallback;
+}
+
+export const config = {
+  nodeEnv: optional('NODE_ENV', 'development'),
+  port: parseInt(optional('PORT', '3344'), 10),
+  isProduction: process.env.NODE_ENV === 'production',
+
+  whatsapp: {
+    token: required('WHATSAPP_TOKEN'),
+    phoneNumberId: required('WHATSAPP_PHONE_NUMBER_ID'),
+    verifyToken: required('WHATSAPP_VERIFY_TOKEN'),
+    testMode: optional('WHATSAPP_TEST_MODE', 'false') === 'true',
+    apiVersion: optional('WHATSAPP_API_VERSION', 'v22.0'),
+  },
+
+  db: {
+    host: optional('DB_HOST', '127.0.0.1'),
+    port: parseInt(optional('DB_PORT', '3306'), 10),
+    user: required('DB_USER'),
+    password: optional('DB_PASSWORD', ''),
+    name: required('DB_NAME'),
+  },
+
+  ai: {
+    provider: optional('AI_PROVIDER', 'none') as 'openai' | 'bedrock' | 'none',
+    openai: {
+      apiKey: optional('OPENAI_API_KEY', ''),
+      model: optional('OPENAI_MODEL', 'gpt-4o-mini'),
+    },
+    bedrock: {
+      region: optional('AWS_BEDROCK_REGION', 'us-east-1'),
+      model: optional('AWS_BEDROCK_MODEL', 'anthropic.claude-3-5-haiku-20241022-v1:0'),
+      maxTokens: parseInt(optional('AWS_BEDROCK_MAX_TOKENS', '800'), 10),
+    },
+  },
+
+  storage: {
+    provider: optional('STORAGE_PROVIDER', 'local') as 'local' | 's3',
+    s3: {
+      bucket: optional('AWS_S3_BUCKET', ''),
+      region: optional('AWS_S3_REGION', ''),
+    },
+  },
+
+  subscription: {
+    enabled: optional('SUBSCRIPTION_ENABLED', 'false') === 'true',
+  },
+
+  web: {
+    corsOrigin: optional('WEB_CORS_ORIGIN', 'http://localhost:3000'),
+  },
+} as const;

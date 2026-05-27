@@ -1,0 +1,21 @@
+{
+    "apps": [
+        {
+            "name": "WAU-POC-API-SIT",
+            "script": "dist-sit/server.js",
+            "instances": "max",
+            "exec_mode": "cluster",
+            "merge_logs": true,
+            "env": {
+                "HOSTNAME": "localhost",
+                "PORT": 3017
+            },
+            "log_date_format": "YYYY-MM-DD HH:mm Z",
+            "output": "next-sit/standalone/logs/server-output.log",
+            "error": "next-sit/standalone/logs/server-error.log"
+        }
+    ],
+    "deploy": {
+        "post-deploy": "pm2 startOrReload ecosystem.json --only WAU-POC-API-SIT && pm2 save"
+    }
+}

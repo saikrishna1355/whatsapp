@@ -1,0 +1,11 @@
+node_modules/
+dist/
+dist-uat/
+dist-live/
+.env
+.env.sit
+.env.uat
+.env.live
+*.log
+media/
+src/public/
