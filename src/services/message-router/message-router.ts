@@ -9,6 +9,7 @@ import { sendMenu } from './handlers/menu.handler';
 import { logger } from '../../utils/logger';
 import { parseEntries } from '../../utils/parse-entries';
 import { whatsappClient } from '../whatsapp/whatsapp.client';
+import { supportTicketRepository, type TicketType } from '../../modules/support/support-ticket.repository';
 
 const PENDING_EXPIRE_MINUTES = 3;
 
@@ -28,11 +29,25 @@ export const messageRouter = {
       const normalized = message.text?.trim().toLowerCase();
 
       if (message.flowPayload) {
-        const supportType = message.flowPayload.support_type || 'other';
+        const rawType = (message.flowPayload.support_type || 'other').toLowerCase();
+        const supportType: TicketType =
+          rawType === 'billing' || rawType === 'technical' || rawType === 'account'
+            ? 'complaint'
+            : rawType === 'feedback'
+              ? 'feedback'
+              : rawType === 'suggestion'
+                ? 'suggestion'
+                : 'other';
         const issue = message.flowPayload.issue_description || '';
+        const ticket = await supportTicketRepository.create({
+          phoneNumber: from,
+          ticketType: supportType,
+          description: issue,
+          externalMessageId: message.messageId,
+        });
         await whatsappClient.sendText(
           from,
-          `✅ Support request submitted.\nType: ${supportType}\nIssue: ${issue.slice(0, 180)}`
+          `✅ Support request submitted.\nTicket ID: #${ticket.id}\nType: ${supportType}\nIssue: ${issue.slice(0, 180)}`
         );
         await sessionService.reset(from);
         await sendMenu(from);

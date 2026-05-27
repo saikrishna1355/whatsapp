@@ -43,6 +43,7 @@ const menu_handler_2 = require("./handlers/menu.handler");
 const logger_1 = require("../../utils/logger");
 const parse_entries_1 = require("../../utils/parse-entries");
 const whatsapp_client_1 = require("../whatsapp/whatsapp.client");
+const support_ticket_repository_1 = require("../../modules/support/support-ticket.repository");
 const PENDING_EXPIRE_MINUTES = 3;
 const handlers = {
     menu: menu_handler_1.menuHandler,
@@ -57,9 +58,22 @@ exports.messageRouter = {
             let session = await session_service_1.sessionService.getOrCreate(from);
             const normalized = message.text?.trim().toLowerCase();
             if (message.flowPayload) {
-                const supportType = message.flowPayload.support_type || 'other';
+                const rawType = (message.flowPayload.support_type || 'other').toLowerCase();
+                const supportType = rawType === 'billing' || rawType === 'technical' || rawType === 'account'
+                    ? 'complaint'
+                    : rawType === 'feedback'
+                        ? 'feedback'
+                        : rawType === 'suggestion'
+                            ? 'suggestion'
+                            : 'other';
                 const issue = message.flowPayload.issue_description || '';
-                await whatsapp_client_1.whatsappClient.sendText(from, `✅ Support request submitted.\nType: ${supportType}\nIssue: ${issue.slice(0, 180)}`);
+                const ticket = await support_ticket_repository_1.supportTicketRepository.create({
+                    phoneNumber: from,
+                    ticketType: supportType,
+                    description: issue,
+                    externalMessageId: message.messageId,
+                });
+                await whatsapp_client_1.whatsappClient.sendText(from, `✅ Support request submitted.\nTicket ID: #${ticket.id}\nType: ${supportType}\nIssue: ${issue.slice(0, 180)}`);
                 await session_service_1.sessionService.reset(from);
                 await (0, menu_handler_2.sendMenu)(from);
                 return;
