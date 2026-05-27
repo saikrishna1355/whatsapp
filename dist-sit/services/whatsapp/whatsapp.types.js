@@ -12,6 +12,7 @@ function extractInboundMessage(body) {
         message.interactive?.list_reply?.id ||
         message.text?.body?.trim() ||
         null;
+    const flowPayload = message.interactive?.nfm_reply?.response_json || null;
     let mediaPayload = null;
     for (const type of ['image', 'audio', 'document', 'video']) {
         if (message[type]) {
@@ -27,8 +28,9 @@ function extractInboundMessage(body) {
     }
     return {
         from,
-        text,
+        text: text || (flowPayload ? 'support_flow_submit' : null),
         mediaPayload,
+        flowPayload,
         timestamp: message.timestamp,
         messageId: message.id,
     };

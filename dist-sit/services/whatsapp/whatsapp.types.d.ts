@@ -2,6 +2,7 @@ export interface InboundMessage {
     from: string;
     text: string | null;
     mediaPayload: MediaPayload | null;
+    flowPayload: SupportFlowPayload | null;
     timestamp: string;
     messageId: string;
 }
@@ -24,5 +25,9 @@ export interface ListRow {
 export interface ListSection {
     title: string;
     rows: ListRow[];
+}
+export interface SupportFlowPayload {
+    support_type?: string;
+    issue_description?: string;
 }
 export declare function extractInboundMessage(body: unknown): InboundMessage | null;

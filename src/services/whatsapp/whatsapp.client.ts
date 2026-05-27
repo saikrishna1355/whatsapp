@@ -15,7 +15,7 @@ const headers = {
 };
 
 export interface TestReply {
-  type: 'text' | 'buttons' | 'list' | 'document';
+  type: 'text' | 'buttons' | 'list' | 'document' | 'flow';
   to: string;
   body?: string;
   buttons?: Button[];
@@ -78,6 +78,38 @@ export const whatsappClient = {
       messaging_product: 'whatsapp',
       to,
       text: { body },
+    }, { headers });
+  },
+
+  async sendSupportFlow(to: string): Promise<void> {
+    if (isTestMode()) {
+      testReplies.push({ type: 'flow', to, body: 'Support Flow opened' });
+      return;
+    }
+
+    await axios.post(messagesUrl, {
+      messaging_product: 'whatsapp',
+      to,
+      type: 'interactive',
+      interactive: {
+        type: 'flow',
+        header: { type: 'text', text: 'Customer Support' },
+        body: { text: 'Share your issue using the support form.' },
+        footer: { text: 'Your request will be reviewed by our team.' },
+        action: {
+          name: 'flow',
+          parameters: {
+            flow_message_version: '3',
+            flow_id: config.whatsapp.supportFlowId,
+            flow_cta: 'Open Support Form',
+            flow_action: 'navigate',
+            flow_action_payload: {
+              screen: 'SUPPORT_HOME',
+              data: {},
+            },
+          },
+        },
+      },
     }, { headers });
   },
 

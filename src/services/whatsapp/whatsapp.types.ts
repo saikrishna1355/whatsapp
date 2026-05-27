@@ -2,6 +2,7 @@ export interface InboundMessage {
   from: string;
   text: string | null;
   mediaPayload: MediaPayload | null;
+  flowPayload: SupportFlowPayload | null;
   timestamp: string;
   messageId: string;
 }
@@ -30,6 +31,11 @@ export interface ListSection {
   rows: ListRow[];
 }
 
+export interface SupportFlowPayload {
+  support_type?: string;
+  issue_description?: string;
+}
+
 export function extractInboundMessage(body: unknown): InboundMessage | null {
   const entry = (body as any)?.entry?.[0];
   const change = entry?.changes?.[0]?.value;
@@ -43,6 +49,7 @@ export function extractInboundMessage(body: unknown): InboundMessage | null {
     message.interactive?.list_reply?.id ||
     message.text?.body?.trim() ||
     null;
+  const flowPayload: SupportFlowPayload | null = message.interactive?.nfm_reply?.response_json || null;
 
   let mediaPayload: MediaPayload | null = null;
   for (const type of ['image', 'audio', 'document', 'video'] as const) {
@@ -60,8 +67,9 @@ export function extractInboundMessage(body: unknown): InboundMessage | null {
 
   return {
     from,
-    text,
+    text: text || (flowPayload ? 'support_flow_submit' : null),
     mediaPayload,
+    flowPayload,
     timestamp: message.timestamp,
     messageId: message.id,
   };

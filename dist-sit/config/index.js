@@ -26,6 +26,7 @@ exports.config = {
         verifyToken: required('WHATSAPP_VERIFY_TOKEN'),
         testMode: optional('WHATSAPP_TEST_MODE', 'false') === 'true',
         apiVersion: optional('WHATSAPP_API_VERSION', 'v22.0'),
+        supportFlowId: optional('WHATSAPP_SUPPORT_FLOW_ID', '1517875766636850'),
     },
     db: {
         host: optional('DB_HOST', '127.0.0.1'),

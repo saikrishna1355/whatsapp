@@ -8,6 +8,7 @@ export declare const config: {
         readonly verifyToken: string;
         readonly testMode: boolean;
         readonly apiVersion: string;
+        readonly supportFlowId: string;
     };
     readonly db: {
         readonly host: string;

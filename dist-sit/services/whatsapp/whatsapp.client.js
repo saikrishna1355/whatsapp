@@ -70,6 +70,36 @@ exports.whatsappClient = {
             text: { body },
         }, { headers });
     },
+    async sendSupportFlow(to) {
+        if (isTestMode()) {
+            testReplies.push({ type: 'flow', to, body: 'Support Flow opened' });
+            return;
+        }
+        await axios_1.default.post(messagesUrl, {
+            messaging_product: 'whatsapp',
+            to,
+            type: 'interactive',
+            interactive: {
+                type: 'flow',
+                header: { type: 'text', text: 'Customer Support' },
+                body: { text: 'Share your issue using the support form.' },
+                footer: { text: 'Your request will be reviewed by our team.' },
+                action: {
+                    name: 'flow',
+                    parameters: {
+                        flow_message_version: '3',
+                        flow_id: config_1.config.whatsapp.supportFlowId,
+                        flow_cta: 'Open Support Form',
+                        flow_action: 'navigate',
+                        flow_action_payload: {
+                            screen: 'SUPPORT_HOME',
+                            data: {},
+                        },
+                    },
+                },
+            },
+        }, { headers });
+    },
     async sendButtons(to, body, buttons) {
         const finalButtons = withNavButtons(buttons);
         const payload = {

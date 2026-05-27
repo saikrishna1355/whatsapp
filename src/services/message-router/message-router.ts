@@ -27,9 +27,26 @@ export const messageRouter = {
       let session = await sessionService.getOrCreate(from);
       const normalized = message.text?.trim().toLowerCase();
 
+      if (message.flowPayload) {
+        const supportType = message.flowPayload.support_type || 'other';
+        const issue = message.flowPayload.issue_description || '';
+        await whatsappClient.sendText(
+          from,
+          `✅ Support request submitted.\nType: ${supportType}\nIssue: ${issue.slice(0, 180)}`
+        );
+        await sessionService.reset(from);
+        await sendMenu(from);
+        return;
+      }
+
       if (normalized === 'back' || normalized === 'home') {
         await sessionService.reset(from);
         await sendMenu(from);
+        return;
+      }
+
+      if (normalized === 'support' || normalized === 'complaint' || normalized === 'feedback') {
+        await whatsappClient.sendSupportFlow(from);
         return;
       }
 

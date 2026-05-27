@@ -1,6 +1,6 @@
 import type { Button, ListSection } from './whatsapp.types';
 export interface TestReply {
-    type: 'text' | 'buttons' | 'list' | 'document';
+    type: 'text' | 'buttons' | 'list' | 'document' | 'flow';
     to: string;
     body?: string;
     buttons?: Button[];
@@ -13,6 +13,7 @@ export declare function resetTestReplies(): void;
 export declare const whatsappClient: {
     indicateTyping(messageId: string): Promise<void>;
     sendText(to: string, body: string): Promise<void>;
+    sendSupportFlow(to: string): Promise<void>;
     sendButtons(to: string, body: string, buttons: Button[]): Promise<void>;
     sendList(to: string, body: string, buttonText: string, sections: ListSection[]): Promise<void>;
     sendDocument(to: string, pdfBuffer: Buffer, filename: string): Promise<void>;
