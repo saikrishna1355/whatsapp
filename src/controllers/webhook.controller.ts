@@ -4,6 +4,7 @@ import { extractInboundMessage } from '../services/whatsapp/whatsapp.types';
 import { messageRouter } from '../services/message-router/message-router';
 import { resetTestReplies, collectTestReplies } from '../services/whatsapp/whatsapp.client';
 import { logger } from '../utils/logger';
+import { processedMessageRepository } from '../modules/webhook/processed-message.repository';
 
 export async function verifyWebhook(req: Request, res: Response): Promise<void> {
   const mode = req.query['hub.mode'] as string;
@@ -41,6 +42,13 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
         input: message.text,
         replies,
       });
+      return;
+    }
+
+    const isNew = await processedMessageRepository.markIfNew(message.messageId, message.from);
+    if (!isNew) {
+      logger.info({ messageId: message.messageId, from: message.from }, 'Duplicate webhook message ignored');
+      res.sendStatus(200);
       return;
     }
 

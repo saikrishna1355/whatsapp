@@ -7,6 +7,7 @@ const whatsapp_types_1 = require("../services/whatsapp/whatsapp.types");
 const message_router_1 = require("../services/message-router/message-router");
 const whatsapp_client_1 = require("../services/whatsapp/whatsapp.client");
 const logger_1 = require("../utils/logger");
+const processed_message_repository_1 = require("../modules/webhook/processed-message.repository");
 async function verifyWebhook(req, res) {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
@@ -37,6 +38,12 @@ async function handleWebhook(req, res) {
                 input: message.text,
                 replies,
             });
+            return;
+        }
+        const isNew = await processed_message_repository_1.processedMessageRepository.markIfNew(message.messageId, message.from);
+        if (!isNew) {
+            logger_1.logger.info({ messageId: message.messageId, from: message.from }, 'Duplicate webhook message ignored');
+            res.sendStatus(200);
             return;
         }
         // Production: acknowledge immediately, process async
