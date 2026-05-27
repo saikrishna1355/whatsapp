@@ -7,7 +7,6 @@ exports.generateReportPDF = generateReportPDF;
 const pdfkit_1 = __importDefault(require("pdfkit"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
-const date_1 = require("../../utils/date");
 const PAGE_MARGIN = 34;
 const CONTENT_WIDTH = 595.28 - PAGE_MARGIN * 2;
 const CARD_GAP = 10;
@@ -17,6 +16,23 @@ const BRAND_LOGO_PATH = '/home/administrator/whatsapp/whatsapp/brand-placeholder
 function money(n) {
     return `Rs ${n.toFixed(2)}`;
 }
+function formatDateOnly(value) {
+    const d = new Date(value);
+    if (isNaN(d.getTime()))
+        return String(value).slice(0, 10);
+    return d.toISOString().slice(0, 10);
+}
+function formatDateCompact(value) {
+    const d = new Date(value);
+    if (isNaN(d.getTime()))
+        return String(value);
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${dd}-${mm}-${yy} ${hh}:${min}`;
+}
 function ensureSpace(doc, needed = 40) {
     const bottom = doc.page.height - doc.page.margins.bottom;
     if (doc.y + needed > bottom)
@@ -25,7 +41,7 @@ function ensureSpace(doc, needed = 40) {
 function drawHeader(doc, data, dateFrom, dateTo) {
     const x = PAGE_MARGIN;
     const y = doc.y;
-    const h = 88;
+    const h = 116;
     doc.roundedRect(x, y, CONTENT_WIDTH, h, 14).fill('#0f4c5c');
     const logoX = x + 16;
     const logoY = y + 14;
@@ -48,20 +64,20 @@ function drawHeader(doc, data, dateFrom, dateTo) {
         }
     }
     doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(18).text(BRAND_NAME, titleX, y + 14);
-    doc.fillColor('#ffffff').font('Helvetica').fontSize(10).text('Business Report', titleX, y + 34);
+    doc.fillColor('#ffffff').font('Helvetica').fontSize(11).text('Business Report', titleX, y + 38);
     doc.font('Helvetica').fontSize(10).fillColor('#d9eef3');
-    doc.text(data.period === 'week' ? 'Weekly Financial Summary' : 'Daily Financial Summary', titleX, y + 50);
-    doc.text(`Period: ${dateFrom}  to  ${dateTo}`, x + 16, y + 56);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, x + 16, y + 70);
+    doc.text(data.period === 'week' ? 'Weekly Financial Summary' : 'Daily Financial Summary', titleX, y + 56);
+    doc.text(`Period: ${dateFrom}  to  ${dateTo}`, x + 16, y + 76);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, x + 16, y + 92);
     doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(24).text(money(data.profit), x, y + 22, {
         width: CONTENT_WIDTH - 16,
         align: 'right',
     });
-    doc.font('Helvetica').fontSize(10).fillColor('#d9eef3').text('Net Profit', x, y + 55, {
+    doc.font('Helvetica').fontSize(10).fillColor('#d9eef3').text('Net Profit', x, y + 60, {
         width: CONTENT_WIDTH - 16,
         align: 'right',
     });
-    doc.moveDown(4.8);
+    doc.y = y + h + 10;
 }
 function drawKpiCards(doc, data) {
     ensureSpace(doc, 92);
@@ -132,7 +148,7 @@ function drawTopItems(doc, title, items, tone) {
 function summarizeByDate(entries) {
     const m = new Map();
     for (const e of entries) {
-        const d = (0, date_1.formatDate)(e.date);
+        const d = formatDateOnly(e.date);
         m.set(d, (m.get(d) || 0) + Number(e.amount));
     }
     return m;
@@ -181,8 +197,8 @@ function drawDetailTable(doc, title, rows) {
     const drawHeader = () => {
         doc.roundedRect(x, y, CONTENT_WIDTH, 22, 8).fill('#eef2f7');
         doc.fillColor('#4b5563').font('Helvetica-Bold').fontSize(9);
-        doc.text('Date', x + 10, y + 7, { width: 80 });
-        doc.text('Description', x + 95, y + 7, { width: 320 });
+        doc.text('Date', x + 10, y + 7, { width: 120 });
+        doc.text('Description', x + 130, y + 7, { width: 285 });
         doc.text('Amount', x + 430, y + 7, { width: 90, align: 'right' });
         y += 24;
     };
@@ -199,8 +215,8 @@ function drawDetailTable(doc, title, rows) {
         if (i % 2 === 0)
             doc.rect(x, y, CONTENT_WIDTH, rowH).fill('#fbfdff');
         doc.fillColor('#111827').font('Helvetica').fontSize(9);
-        doc.text((0, date_1.formatDate)(r.date), x + 10, y + 6, { width: 80 });
-        doc.text(r.description, x + 95, y + 6, { width: 320, ellipsis: true });
+        doc.text(formatDateCompact(r.date), x + 10, y + 6, { width: 120, lineBreak: false, ellipsis: true });
+        doc.text(r.description, x + 130, y + 6, { width: 285, ellipsis: true });
         doc.text(money(Number(r.amount)), x + 430, y + 6, { width: 90, align: 'right' });
         y += rowH;
         if (y + 30 > doc.page.height - doc.page.margins.bottom) {
@@ -223,7 +239,9 @@ function generateReportPDF(data, dateFrom, dateTo) {
         drawSectionTitle(doc, 'Highlights');
         drawTopItems(doc, 'Top Income Items', summarizeByDescription(data.incomes), 'income');
         drawTopItems(doc, 'Top Expense Items', summarizeByDescription(data.expenses), 'expense');
-        drawDailySummary(doc, data.incomes, data.expenses);
+        if (data.period === 'week') {
+            drawDailySummary(doc, data.incomes, data.expenses);
+        }
         drawDetailTable(doc, 'Income Transactions', data.incomes);
         drawDetailTable(doc, 'Expense Transactions', data.expenses);
         doc.moveDown(0.8);
