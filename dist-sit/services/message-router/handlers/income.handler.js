@@ -17,8 +17,8 @@ exports.incomeHandler = {
             try {
                 entries = await (0, media_ai_service_1.extractEntriesFromMedia)(mediaPayload, 'income');
             }
-            catch {
-                logger_1.logger.error({ from, mediaType: mediaPayload.type }, 'Income media extraction failed');
+            catch (err) {
+                logger_1.logger.error({ err, from, mediaType: mediaPayload.type }, 'Income media extraction failed');
                 await whatsapp_client_1.whatsappClient.sendText(from, 'Unable to process media now. Please send income as text: Description Amount');
                 return;
             }

@@ -18,8 +18,8 @@ export const incomeHandler: MessageHandler = {
     if (entries.length === 0 && mediaPayload && (mediaPayload.type === 'image' || mediaPayload.type === 'audio')) {
       try {
         entries = await extractEntriesFromMedia(mediaPayload, 'income');
-      } catch {
-        logger.error({ from, mediaType: mediaPayload.type }, 'Income media extraction failed');
+      } catch (err) {
+        logger.error({ err, from, mediaType: mediaPayload.type }, 'Income media extraction failed');
         await whatsappClient.sendText(from, 'Unable to process media now. Please send income as text: Description Amount');
         return;
       }

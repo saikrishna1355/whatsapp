@@ -17,8 +17,8 @@ exports.expenseHandler = {
             try {
                 entries = await (0, media_ai_service_1.extractEntriesFromMedia)(mediaPayload, 'expense');
             }
-            catch {
-                logger_1.logger.error({ from, mediaType: mediaPayload.type }, 'Expense media extraction failed');
+            catch (err) {
+                logger_1.logger.error({ err, from, mediaType: mediaPayload.type }, 'Expense media extraction failed');
                 await whatsapp_client_1.whatsappClient.sendText(from, 'Unable to process media now. Please send expense as text: Description Amount');
                 return;
             }
