@@ -10,7 +10,7 @@ import { today, daysAgo } from '../../../utils/date';
 
 export const reportHandler: MessageHandler = {
   async handle(message: InboundMessage, session: UserSession): Promise<void> {
-    const { from, text } = message;
+    const { from, text, messageId } = message;
     const normalized = text?.toLowerCase() || '';
 
     let period: 'today' | 'week' = 'today';
@@ -21,6 +21,12 @@ export const reportHandler: MessageHandler = {
     const dateTo = today();
     const dateFrom = period === 'week' ? daysAgo(7) : dateTo;
     const userId = await userRepository.getIdByPhone(from);
+
+    try {
+      await whatsappClient.indicateTyping(messageId);
+    } catch {
+      // non-blocking
+    }
 
     const { buffer, filename } = await buildReport(from, userId, period, dateFrom, dateTo);
     await whatsappClient.sendDocument(from, buffer, filename);

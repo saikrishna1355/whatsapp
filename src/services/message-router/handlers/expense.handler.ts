@@ -37,11 +37,16 @@ async function sendConfirmationPrompt(to: string, entries: Array<{ description: 
 
 export const expenseHandler: MessageHandler = {
   async handle(message: InboundMessage, session: UserSession): Promise<void> {
-    const { from, text, mediaPayload } = message;
+    const { from, text, mediaPayload, messageId } = message;
     const context = (session.context || {}) as PendingAIContext;
 
     if (session.step === 'await_ai_confirmation') {
       if (mediaPayload && (mediaPayload.type === 'image' || mediaPayload.type === 'audio')) {
+        try {
+          await whatsappClient.indicateTyping(messageId);
+        } catch {
+          // non-blocking
+        }
         const extracted = await extractEntriesFromMedia(mediaPayload, 'expense');
         if (extracted.entries.length === 0) {
           await whatsappClient.sendText(from, "Couldn't extract entries from this media. Send another one or choose Confirm/Edit/Cancel.");
@@ -112,6 +117,11 @@ export const expenseHandler: MessageHandler = {
     logger.debug({ from, source: text ? 'text' : 'media', parsedCount: entries.length }, 'Expense parsing attempt');
     if (entries.length === 0 && mediaPayload && (mediaPayload.type === 'image' || mediaPayload.type === 'audio')) {
       try {
+        try {
+          await whatsappClient.indicateTyping(messageId);
+        } catch {
+          // non-blocking
+        }
         const extracted = await extractEntriesFromMedia(mediaPayload, 'expense');
         entries = extracted.entries;
         if (entries.length === 0 && extracted.hintDescription) {
