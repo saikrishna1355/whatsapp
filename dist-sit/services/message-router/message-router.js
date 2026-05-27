@@ -39,8 +39,11 @@ const menu_handler_1 = require("./handlers/menu.handler");
 const income_handler_1 = require("./handlers/income.handler");
 const expense_handler_1 = require("./handlers/expense.handler");
 const report_handler_1 = require("./handlers/report.handler");
+const menu_handler_2 = require("./handlers/menu.handler");
 const logger_1 = require("../../utils/logger");
 const parse_entries_1 = require("../../utils/parse-entries");
+const whatsapp_client_1 = require("../whatsapp/whatsapp.client");
+const PENDING_EXPIRE_MINUTES = 3;
 const handlers = {
     menu: menu_handler_1.menuHandler,
     income: income_handler_1.incomeHandler,
@@ -51,7 +54,21 @@ exports.messageRouter = {
     async route(message) {
         const { from } = message;
         try {
-            const session = await session_service_1.sessionService.getOrCreate(from);
+            let session = await session_service_1.sessionService.getOrCreate(from);
+            const normalized = message.text?.trim().toLowerCase();
+            if (normalized === 'back' || normalized === 'home') {
+                await session_service_1.sessionService.reset(from);
+                await (0, menu_handler_2.sendMenu)(from);
+                return;
+            }
+            if (session.step === 'await_ai_confirmation' || session.step === 'await_ai_edit') {
+                const elapsedMins = (Date.now() - new Date(session.updatedAt).getTime()) / 1000 / 60;
+                if (elapsedMins > PENDING_EXPIRE_MINUTES) {
+                    await session_service_1.sessionService.reset(from);
+                    await whatsapp_client_1.whatsappClient.sendText(from, 'Inactive detected. Please send hi to start again.');
+                    session = await session_service_1.sessionService.getOrCreate(from);
+                }
+            }
             logger_1.logger.debug({ from, module: session.module, step: session.step, text: message.text }, 'Routing message');
             if (session.module === 'menu' && message.text) {
                 const entries = (0, parse_entries_1.parseEntries)(message.text);

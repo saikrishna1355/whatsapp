@@ -5,8 +5,12 @@ import { menuHandler } from './handlers/menu.handler';
 import { incomeHandler } from './handlers/income.handler';
 import { expenseHandler } from './handlers/expense.handler';
 import { reportHandler } from './handlers/report.handler';
+import { sendMenu } from './handlers/menu.handler';
 import { logger } from '../../utils/logger';
 import { parseEntries } from '../../utils/parse-entries';
+import { whatsappClient } from '../whatsapp/whatsapp.client';
+
+const PENDING_EXPIRE_MINUTES = 3;
 
 const handlers: Record<string, MessageHandler> = {
   menu: menuHandler,
@@ -20,7 +24,23 @@ export const messageRouter = {
     const { from } = message;
 
     try {
-      const session = await sessionService.getOrCreate(from);
+      let session = await sessionService.getOrCreate(from);
+      const normalized = message.text?.trim().toLowerCase();
+
+      if (normalized === 'back' || normalized === 'home') {
+        await sessionService.reset(from);
+        await sendMenu(from);
+        return;
+      }
+
+      if (session.step === 'await_ai_confirmation' || session.step === 'await_ai_edit') {
+        const elapsedMins = (Date.now() - new Date(session.updatedAt).getTime()) / 1000 / 60;
+        if (elapsedMins > PENDING_EXPIRE_MINUTES) {
+          await sessionService.reset(from);
+          await whatsappClient.sendText(from, 'Inactive detected. Please send hi to start again.');
+          session = await sessionService.getOrCreate(from);
+        }
+      }
 
       logger.debug({ from, module: session.module, step: session.step, text: message.text }, 'Routing message');
 

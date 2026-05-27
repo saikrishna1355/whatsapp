@@ -31,6 +31,20 @@ function resetTestReplies() {
 function isTestMode() {
     return config_1.config.whatsapp.testMode;
 }
+function withNavButtons(buttons) {
+    const out = [...buttons];
+    const nav = [
+        { id: 'back', title: 'Back' },
+        { id: 'home', title: 'Home' },
+    ];
+    for (const b of nav) {
+        if (out.length >= 3)
+            break;
+        if (!out.some((x) => x.id === b.id))
+            out.push(b);
+    }
+    return out.slice(0, 3);
+}
 exports.whatsappClient = {
     async indicateTyping(messageId) {
         if (isTestMode())
@@ -57,6 +71,7 @@ exports.whatsappClient = {
         }, { headers });
     },
     async sendButtons(to, body, buttons) {
+        const finalButtons = withNavButtons(buttons);
         const payload = {
             messaging_product: 'whatsapp',
             to,
@@ -65,7 +80,7 @@ exports.whatsappClient = {
                 type: 'button',
                 body: { text: body },
                 action: {
-                    buttons: buttons.map((btn) => ({
+                    buttons: finalButtons.map((btn) => ({
                         type: 'reply',
                         reply: { id: btn.id, title: btn.title.slice(0, 20) },
                     })),
@@ -73,8 +88,8 @@ exports.whatsappClient = {
             },
         };
         if (isTestMode()) {
-            logger_1.logger.debug({ to, body, buttons }, '[TEST_MODE] sendButtons');
-            testReplies.push({ type: 'buttons', to, body, buttons });
+            logger_1.logger.debug({ to, body, buttons: finalButtons }, '[TEST_MODE] sendButtons');
+            testReplies.push({ type: 'buttons', to, body, buttons: finalButtons });
             return;
         }
         await axios_1.default.post(messagesUrl, payload, { headers });

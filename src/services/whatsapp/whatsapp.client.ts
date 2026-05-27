@@ -41,6 +41,20 @@ function isTestMode(): boolean {
   return config.whatsapp.testMode;
 }
 
+function withNavButtons(buttons: Button[]): Button[] {
+  const out = [...buttons];
+  const nav: Button[] = [
+    { id: 'back', title: 'Back' },
+    { id: 'home', title: 'Home' },
+  ];
+
+  for (const b of nav) {
+    if (out.length >= 3) break;
+    if (!out.some((x) => x.id === b.id)) out.push(b);
+  }
+  return out.slice(0, 3);
+}
+
 export const whatsappClient = {
   async indicateTyping(messageId: string): Promise<void> {
     if (isTestMode()) return;
@@ -68,6 +82,7 @@ export const whatsappClient = {
   },
 
   async sendButtons(to: string, body: string, buttons: Button[]): Promise<void> {
+    const finalButtons = withNavButtons(buttons);
     const payload = {
       messaging_product: 'whatsapp',
       to,
@@ -76,7 +91,7 @@ export const whatsappClient = {
         type: 'button',
         body: { text: body },
         action: {
-          buttons: buttons.map((btn) => ({
+          buttons: finalButtons.map((btn) => ({
             type: 'reply',
             reply: { id: btn.id, title: btn.title.slice(0, 20) },
           })),
@@ -85,8 +100,8 @@ export const whatsappClient = {
     };
 
     if (isTestMode()) {
-      logger.debug({ to, body, buttons }, '[TEST_MODE] sendButtons');
-      testReplies.push({ type: 'buttons', to, body, buttons });
+      logger.debug({ to, body, buttons: finalButtons }, '[TEST_MODE] sendButtons');
+      testReplies.push({ type: 'buttons', to, body, buttons: finalButtons });
       return;
     }
     await axios.post(messagesUrl, payload, { headers });
