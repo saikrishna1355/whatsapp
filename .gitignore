@@ -7,4 +7,4 @@ dist-live/
 .env.live
 *.log
 media/
-src/public/
+src/public/.env*
