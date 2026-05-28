@@ -11,6 +11,7 @@ import {
   generateReport,
   getUserSubscription,
   updateUserSubscription,
+  chatSimulate,
 } from '../controllers/fe-admin.controller';
 
 export const feAdminRoutes = Router();
@@ -27,3 +28,4 @@ feAdminRoutes.put('/flow', updateFlow);
 feAdminRoutes.get('/report-logs', listReportLogs);
 feAdminRoutes.get('/report-logs/:id/download', downloadReport);
 feAdminRoutes.post('/reports/generate', generateReport);
+feAdminRoutes.post('/chat-simulate', chatSimulate);

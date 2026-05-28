@@ -286,3 +286,33 @@ export async function updateUserSubscription(req: Request, res: Response): Promi
   const sub = await subscriptionRepository.getByUserId(userId);
   res.json({ code: 200, data: sub, message: 'Subscription updated successfully' });
 }
+
+export async function chatSimulate(req: Request, res: Response): Promise<void> {
+  const { phoneNumber, text, buttonId } = req.body as { phoneNumber?: string; text?: string; buttonId?: string };
+
+  if (process.env.WHATSAPP_TEST_MODE !== 'true') {
+    res.status(400).json({ code: 400, message: 'Chat simulator requires WHATSAPP_TEST_MODE=true' });
+    return;
+  }
+
+  if (!phoneNumber || (!text && !buttonId)) {
+    res.status(400).json({ code: 400, message: 'phoneNumber and text/buttonId are required' });
+    return;
+  }
+
+  const { resetTestReplies, collectTestReplies } = await import('../services/whatsapp/whatsapp.client');
+  const { messageRouter } = await import('../services/message-router/message-router');
+
+  resetTestReplies();
+  await messageRouter.route({
+    from: phoneNumber,
+    text: buttonId || text || null,
+    mediaPayload: null,
+    flowPayload: null,
+    timestamp: String(Math.floor(Date.now() / 1000)),
+    messageId: `sim-${Date.now()}`,
+  });
+
+  const replies = collectTestReplies();
+  res.json({ code: 200, data: { replies } });
+}

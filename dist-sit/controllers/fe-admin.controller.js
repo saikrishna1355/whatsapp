@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.listUsers = listUsers;
 exports.getUserTransactions = getUserTransactions;
@@ -10,6 +43,7 @@ exports.generateReport = generateReport;
 exports.updateFlow = updateFlow;
 exports.getUserSubscription = getUserSubscription;
 exports.updateUserSubscription = updateUserSubscription;
+exports.chatSimulate = chatSimulate;
 const connection_1 = require("../database/connection");
 const report_log_repository_1 = require("../modules/report/report-log.repository");
 const report_helper_1 = require("../modules/report/report.helper");
@@ -250,5 +284,29 @@ async function updateUserSubscription(req, res) {
     });
     const sub = await subscription_repository_1.subscriptionRepository.getByUserId(userId);
     res.json({ code: 200, data: sub, message: 'Subscription updated successfully' });
+}
+async function chatSimulate(req, res) {
+    const { phoneNumber, text, buttonId } = req.body;
+    if (process.env.WHATSAPP_TEST_MODE !== 'true') {
+        res.status(400).json({ code: 400, message: 'Chat simulator requires WHATSAPP_TEST_MODE=true' });
+        return;
+    }
+    if (!phoneNumber || (!text && !buttonId)) {
+        res.status(400).json({ code: 400, message: 'phoneNumber and text/buttonId are required' });
+        return;
+    }
+    const { resetTestReplies, collectTestReplies } = await Promise.resolve().then(() => __importStar(require('../services/whatsapp/whatsapp.client')));
+    const { messageRouter } = await Promise.resolve().then(() => __importStar(require('../services/message-router/message-router')));
+    resetTestReplies();
+    await messageRouter.route({
+        from: phoneNumber,
+        text: buttonId || text || null,
+        mediaPayload: null,
+        flowPayload: null,
+        timestamp: String(Math.floor(Date.now() / 1000)),
+        messageId: `sim-${Date.now()}`,
+    });
+    const replies = collectTestReplies();
+    res.json({ code: 200, data: { replies } });
 }
 //# sourceMappingURL=fe-admin.controller.js.map

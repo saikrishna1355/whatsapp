@@ -16,4 +16,5 @@ exports.feAdminRoutes.put('/flow', fe_admin_controller_1.updateFlow);
 exports.feAdminRoutes.get('/report-logs', fe_admin_controller_1.listReportLogs);
 exports.feAdminRoutes.get('/report-logs/:id/download', fe_admin_controller_1.downloadReport);
 exports.feAdminRoutes.post('/reports/generate', fe_admin_controller_1.generateReport);
+exports.feAdminRoutes.post('/chat-simulate', fe_admin_controller_1.chatSimulate);
 //# sourceMappingURL=fe-admin.routes.js.map
