@@ -6,4 +6,12 @@ export declare const subscriptionRepository: {
         plan: string;
         status: string;
     }>;
+    getByUserId(userId: number): Promise<any>;
+    upsertByUserId(userId: number, payload: {
+        plan: "free" | "pro";
+        status?: "active" | "expired" | "cancelled";
+        expiresAt?: string | null;
+    }): Promise<{
+        id: any;
+    }>;
 };

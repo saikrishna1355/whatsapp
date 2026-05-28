@@ -7,3 +7,5 @@ export declare function listReportLogs(req: Request, res: Response): Promise<voi
 export declare function downloadReport(req: Request, res: Response): Promise<void>;
 export declare function generateReport(req: Request, res: Response): Promise<void>;
 export declare function updateFlow(req: Request, res: Response): Promise<void>;
+export declare function getUserSubscription(req: Request, res: Response): Promise<void>;
+export declare function updateUserSubscription(req: Request, res: Response): Promise<void>;

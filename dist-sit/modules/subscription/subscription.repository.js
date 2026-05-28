@@ -9,6 +9,7 @@ exports.subscriptionRepository = {
         return (0, connection_1.db)('subscriptions')
             .where('user_id', userId)
             .where('status', 'active')
+            .orderBy('id', 'desc')
             .first();
     },
     async create(phoneNumber, plan) {
@@ -19,6 +20,34 @@ exports.subscriptionRepository = {
             status: 'active',
         });
         return { id: insertId, user_id: userId, plan, status: 'active' };
+    },
+    async getByUserId(userId) {
+        return (0, connection_1.db)('subscriptions')
+            .where('user_id', userId)
+            .orderBy('id', 'desc')
+            .first();
+    },
+    async upsertByUserId(userId, payload) {
+        const existing = await (0, connection_1.db)('subscriptions')
+            .where('user_id', userId)
+            .orderBy('id', 'desc')
+            .first();
+        const status = payload.status || 'active';
+        if (existing) {
+            await (0, connection_1.db)('subscriptions').where('id', existing.id).update({
+                plan: payload.plan,
+                status,
+                expires_at: payload.expiresAt ?? null,
+            });
+            return { id: existing.id };
+        }
+        const [id] = await (0, connection_1.db)('subscriptions').insert({
+            user_id: userId,
+            plan: payload.plan,
+            status,
+            expires_at: payload.expiresAt ?? null,
+        });
+        return { id };
     },
 };
 //# sourceMappingURL=subscription.repository.js.map

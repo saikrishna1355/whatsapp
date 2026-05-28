@@ -1,13 +1,26 @@
 import { Router } from 'express';
 import { jwtAuthMiddleware } from '../middleware/jwt-auth.middleware';
-import { listUsers, getUserTransactions, listTransactions, getFlow, updateFlow, listReportLogs, downloadReport, generateReport } from '../controllers/fe-admin.controller';
+import {
+  listUsers,
+  getUserTransactions,
+  listTransactions,
+  getFlow,
+  updateFlow,
+  listReportLogs,
+  downloadReport,
+  generateReport,
+  getUserSubscription,
+  updateUserSubscription,
+} from '../controllers/fe-admin.controller';
 
 export const feAdminRoutes = Router();
 
 feAdminRoutes.use(jwtAuthMiddleware);
 
 feAdminRoutes.get('/users', listUsers);
-feAdminRoutes.get('/users/:id/transactions', getUserTransactions)
+feAdminRoutes.get('/users/:id/transactions', getUserTransactions);
+feAdminRoutes.get('/users/:id/subscription', getUserSubscription);
+feAdminRoutes.put('/users/:id/subscription', updateUserSubscription);
 feAdminRoutes.get('/transactions', listTransactions);
 feAdminRoutes.get('/flow', getFlow);
 feAdminRoutes.put('/flow', updateFlow);

@@ -8,10 +8,14 @@ exports.listReportLogs = listReportLogs;
 exports.downloadReport = downloadReport;
 exports.generateReport = generateReport;
 exports.updateFlow = updateFlow;
+exports.getUserSubscription = getUserSubscription;
+exports.updateUserSubscription = updateUserSubscription;
 const connection_1 = require("../database/connection");
 const report_log_repository_1 = require("../modules/report/report-log.repository");
 const report_helper_1 = require("../modules/report/report.helper");
 const date_1 = require("../utils/date");
+const subscription_repository_1 = require("../modules/subscription/subscription.repository");
+const report_quota_service_1 = require("../modules/subscription/report-quota.service");
 async function listUsers(req, res) {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -206,5 +210,45 @@ async function updateFlow(req, res) {
         });
     }
     res.json({ code: 200, message: 'Flow updated successfully' });
+}
+async function getUserSubscription(req, res) {
+    const userId = parseInt(req.params.id, 10);
+    if (!userId) {
+        res.status(400).json({ code: 400, message: 'Invalid user id' });
+        return;
+    }
+    const user = await (0, connection_1.db)('users').where('id', userId).first();
+    if (!user) {
+        res.status(404).json({ code: 404, message: 'User not found' });
+        return;
+    }
+    const sub = await subscription_repository_1.subscriptionRepository.getByUserId(userId);
+    const quota = await report_quota_service_1.reportQuotaService.canGenerateReport(userId);
+    res.json({
+        code: 200,
+        data: {
+            subscription: sub || { plan: 'free', status: 'active', expires_at: null },
+            reportQuota: quota,
+        },
+    });
+}
+async function updateUserSubscription(req, res) {
+    const userId = parseInt(req.params.id, 10);
+    if (!userId) {
+        res.status(400).json({ code: 400, message: 'Invalid user id' });
+        return;
+    }
+    const { plan, status, expiresAt } = req.body;
+    if (!plan || (plan !== 'free' && plan !== 'pro')) {
+        res.status(400).json({ code: 400, message: 'plan must be free or pro' });
+        return;
+    }
+    await subscription_repository_1.subscriptionRepository.upsertByUserId(userId, {
+        plan,
+        status,
+        expiresAt: expiresAt ?? null,
+    });
+    const sub = await subscription_repository_1.subscriptionRepository.getByUserId(userId);
+    res.json({ code: 200, data: sub, message: 'Subscription updated successfully' });
 }
 //# sourceMappingURL=fe-admin.controller.js.map

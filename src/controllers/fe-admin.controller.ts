@@ -3,6 +3,8 @@ import { db } from '../database/connection';
 import { reportLogRepository } from '../modules/report/report-log.repository';
 import { buildReport } from '../modules/report/report.helper';
 import { toDateStr } from '../utils/date';
+import { subscriptionRepository } from '../modules/subscription/subscription.repository';
+import { reportQuotaService } from '../modules/subscription/report-quota.service';
 
 export async function listUsers(req: Request, res: Response): Promise<void> {
   const page = parseInt(req.query.page as string) || 1;
@@ -230,4 +232,57 @@ export async function updateFlow(req: Request, res: Response): Promise<void> {
   }
 
   res.json({ code: 200, message: 'Flow updated successfully' });
+}
+
+export async function getUserSubscription(req: Request, res: Response): Promise<void> {
+  const userId = parseInt(req.params.id, 10);
+  if (!userId) {
+    res.status(400).json({ code: 400, message: 'Invalid user id' });
+    return;
+  }
+
+  const user = await db('users').where('id', userId).first();
+  if (!user) {
+    res.status(404).json({ code: 404, message: 'User not found' });
+    return;
+  }
+
+  const sub = await subscriptionRepository.getByUserId(userId);
+  const quota = await reportQuotaService.canGenerateReport(userId);
+
+  res.json({
+    code: 200,
+    data: {
+      subscription: sub || { plan: 'free', status: 'active', expires_at: null },
+      reportQuota: quota,
+    },
+  });
+}
+
+export async function updateUserSubscription(req: Request, res: Response): Promise<void> {
+  const userId = parseInt(req.params.id, 10);
+  if (!userId) {
+    res.status(400).json({ code: 400, message: 'Invalid user id' });
+    return;
+  }
+
+  const { plan, status, expiresAt } = req.body as {
+    plan?: 'free' | 'pro';
+    status?: 'active' | 'expired' | 'cancelled';
+    expiresAt?: string | null;
+  };
+
+  if (!plan || (plan !== 'free' && plan !== 'pro')) {
+    res.status(400).json({ code: 400, message: 'plan must be free or pro' });
+    return;
+  }
+
+  await subscriptionRepository.upsertByUserId(userId, {
+    plan,
+    status,
+    expiresAt: expiresAt ?? null,
+  });
+
+  const sub = await subscriptionRepository.getByUserId(userId);
+  res.json({ code: 200, data: sub, message: 'Subscription updated successfully' });
 }

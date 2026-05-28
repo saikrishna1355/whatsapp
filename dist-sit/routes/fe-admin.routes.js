@@ -8,6 +8,8 @@ exports.feAdminRoutes = (0, express_1.Router)();
 exports.feAdminRoutes.use(jwt_auth_middleware_1.jwtAuthMiddleware);
 exports.feAdminRoutes.get('/users', fe_admin_controller_1.listUsers);
 exports.feAdminRoutes.get('/users/:id/transactions', fe_admin_controller_1.getUserTransactions);
+exports.feAdminRoutes.get('/users/:id/subscription', fe_admin_controller_1.getUserSubscription);
+exports.feAdminRoutes.put('/users/:id/subscription', fe_admin_controller_1.updateUserSubscription);
 exports.feAdminRoutes.get('/transactions', fe_admin_controller_1.listTransactions);
 exports.feAdminRoutes.get('/flow', fe_admin_controller_1.getFlow);
 exports.feAdminRoutes.put('/flow', fe_admin_controller_1.updateFlow);
